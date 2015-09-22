@@ -17,6 +17,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Scanner;
+import java.util.TreeMap;
 
 /**
  *
@@ -32,15 +33,16 @@ public class SearchEngine {
         final Path currentWorkingPath = Paths.get(folderName).toAbsolutePath();
         // the inverted index
         porterstemmer = new PorterStemmer();
-        final NaiveInvertedIndex index = new NaiveInvertedIndex();
+        final PositionalInvertedIndex index = new PositionalInvertedIndex();
 
         // the list of file names that were processed
-        final ArrayList<String> fileNames = new ArrayList<String>();
+        final ArrayList<String> fileNames = new ArrayList<>();
 
         // This is our standard "walk through all .txt files" code.
         Files.walkFileTree(currentWorkingPath, new SimpleFileVisitor<Path>() {
             int mDocumentID = 0;
 
+            @Override
             public FileVisitResult preVisitDirectory(Path dir,
                     BasicFileAttributes attrs) {
                 // make sure we only process the current working directory
@@ -50,6 +52,7 @@ public class SearchEngine {
                 return FileVisitResult.SKIP_SUBTREE;
             }
 
+            @Override
             public FileVisitResult visitFile(Path file,
                     BasicFileAttributes attrs) {
                 // only process .txt files
@@ -66,21 +69,23 @@ public class SearchEngine {
             }
 
             // don't throw exceptions if files are locked/other errors occur
+            @Override
             public FileVisitResult visitFileFailed(Path file,
                     IOException e) {
-
                 return FileVisitResult.CONTINUE;
             }
 
         });
 
-//        printResults(index, fileNames);
+        printResults(index, fileNames);
+
+        System.exit(0);
         Scanner scan = new Scanner(System.in);
         String input;
         String[] dictionary = index.getDictionary();;
         ArrayList<Integer> postings;
         while (true) {
-            System.out.print("Enter a term to search for: ");
+            System.out.print("Enter a query to search for: ");
             input = scan.nextLine().trim().toLowerCase();
             if (input.equalsIgnoreCase("quit")) {
                 System.out.println("Bye!");
@@ -112,23 +117,36 @@ public class SearchEngine {
      * @param docID the integer ID of the current document, needed when indexing
      * each term from the document.
      */
-    private static void indexFile(File file, NaiveInvertedIndex index,
+    private static void indexFile(File file, PositionalInvertedIndex index,
             int docID) {
         SimpleTokenStream simpleTokenStream = null;
         try {
             simpleTokenStream = new SimpleTokenStream(file);
         } catch (FileNotFoundException ex) {
             ex.printStackTrace();
+            return;
         }
+        long position = 0;
         while (simpleTokenStream.hasNextToken()) {
-            String stemmedToken = porterstemmer.processToken(simpleTokenStream.nextToken().toLowerCase());
-            index.addTerm(stemmedToken, docID);
+            String term = porterstemmer.processToken(simpleTokenStream.nextToken());
+            if (term.contains("-")) {   // process term with '-'
+                // for ab-xy -> store (abxy, ab, xy) all three
+                // all with same position
+                index.addTerm(term.replaceAll("-", ""), docID, position);
+                String[] subtokens = term.split("-");
+                for (String subtoken : subtokens) {
+                    index.addTerm(subtoken, docID, position);
+                }
+            } else {
+                index.addTerm(term, docID, position);
+            }
+            position++;
         }
     }
 
-    private static void printResults(NaiveInvertedIndex index,
+    private static void printResults(PositionalInvertedIndex index,
             ArrayList<String> fileNames) {
-        
+
         String[] dictionary = index.getDictionary();
 
         // find the longest word length in the index
@@ -138,13 +156,24 @@ public class SearchEngine {
             System.out.print(term + ": ");
             printSpaces(longestWord - term.length());
 
-            ArrayList<Integer> postings = index.getPostings(term);
-            for (Integer docId : postings) {
+            TreeMap<Integer, ArrayList<Long>> postings = index.getPostings(term);
+            postings.keySet().stream().map((docId) -> {
                 String file = fileNames.get(docId);
-                System.out.print(file);
+                System.out.print("{" + file);
                 printSpaces(longestFile - file.length());
-                System.out.print(" ");;
-            }
+                System.out.print(" ");
+                return docId;
+            }).map((docId) -> postings.get(docId)).map((positions) -> {
+                System.out.print(":<");
+                return positions;
+            }).map((positions) -> {
+                positions.stream().forEach((position) -> {
+                    System.out.print(position + ",");
+                });
+                return positions;
+            }).forEach((_item) -> {
+                System.out.print("\b>} ");
+            });
             System.out.print("\b\n");
         }
     }

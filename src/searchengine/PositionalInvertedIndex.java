@@ -6,7 +6,6 @@
 package searchengine;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.TreeMap;
 
 /**
