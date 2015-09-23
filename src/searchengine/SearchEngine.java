@@ -27,6 +27,7 @@ public class SearchEngine {
 
     private static PorterStemmer porterstemmer;
     private static int longestFile = 0;
+    private static int numberOfDocuments;
 
     public static void main(String[] args) throws IOException {
         final String folderName = "Search Space";
@@ -64,6 +65,7 @@ public class SearchEngine {
                     fileNames.add(file.getFileName().toString());
                     indexFile(file.toFile(), index, mDocumentID);
                     mDocumentID++;
+                    numberOfDocuments++;
                 }
                 return FileVisitResult.CONTINUE;
             }
@@ -78,6 +80,16 @@ public class SearchEngine {
         });
 
         printResults(index, fileNames);
+        // do the statistics
+        index.indexFinalize();
+        // user's choice of showing statistics
+        boolean isStatistics = true;
+        if(isStatistics){
+            System.out.println("Number of Terms: " + index.getTermCount());
+            System.out.println("Average number of documents per term: " + (long) index.getTotalPostingsSize() / numberOfDocuments);
+            System.out.println("10 most frequent words statistics...IN PROGRESS");
+            System.out.println("Approximate total memory requirement: " + index.getTotalMemory() + "bytes");
+        }
 
         System.exit(0);
         Scanner scan = new Scanner(System.in);
@@ -97,12 +109,12 @@ public class SearchEngine {
                 System.out.println("No documents contain that term..!\n");
                 continue;
             }
-            System.out.println("These documents contain that term:");
-            postings = index.getPostings(dictionary[searchIndex]);
-            for (Integer doc : postings) {
-                System.out.print(fileNames.get(doc) + " ");
-            }
-            System.out.print("\b\n\n");
+//            System.out.println("These documents contain that term:");
+//            postings = index.getPostings(dictionary[searchIndex]);
+//            for (Integer doc : postings) {
+//                System.out.print(fileNames.get(doc) + " ");
+//            }
+//            System.out.print("\b\n\n");
         }
     }
 
@@ -184,4 +196,12 @@ public class SearchEngine {
             System.out.print(" ");
         }
     }
+
+    /**
+     * @return the numberOfDocuments
+     */
+    public long getNumberOfDocuments() {
+        return numberOfDocuments;
+    }
+    
 }

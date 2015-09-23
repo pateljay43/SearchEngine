@@ -20,10 +20,8 @@ public class PositionalInvertedIndex {
     private int longestWord;
 
     // Variables for statistics
-    private long numberOfTerms;
-    private long numberOfTypes;
-    private long numberOfDocuments;
     private long totalPostingsSize;
+    private long totalMemory;
 
     /**
      * creates new mIndex which stores terms with document in which it occurs
@@ -102,46 +100,29 @@ public class PositionalInvertedIndex {
     }
 
     /**
-     * @return the numberOfTerms
+     * @return the totalMemory
      */
-    public long getNumberOfTerms() {
-        return numberOfTerms;
+    public long getTotalMemory() {
+        return totalMemory;
     }
-
-    /**
-     * @return the numberOfTypes
-     */
-    public long getNumberOfTypes() {
-        return numberOfTypes;
-    }
-
-    /**
-     * @return the numberOfDocuments
-     */
-    public long getNumberOfDocuments() {
-        return numberOfDocuments;
-    }
-
+    
     /**
      * @return the totalPostingsSize
      */
     public long getTotalPostingsSize() {
         return totalPostingsSize;
     }
-
-    // returns the average number of docs in the postings list of a term in the index.
-    public long averagePostings(int docs, int postings) {
-        return totalPostingsSize / numberOfDocuments;
-    }
-
-    // calculate and return total memory
-    public long totalMem() {
-        long hashMem = 24 + 36 * numberOfTerms;
+    
+    // statistics 
+    public void indexFinalize() {       
         long totalStrMem = 0;
         long totalPostListMem = 0;
         long totalPostMem = 0;
+        totalPostingsSize = 0;
         
         Set keys = mIndex.keySet();
+        // calculate total hash memory
+        long hashMem = 24 + 36 * mIndex.size();
         Iterator itr = keys.iterator();
         while (itr.hasNext()) {
             String key = (String) itr.next();
@@ -159,8 +140,9 @@ public class PositionalInvertedIndex {
             while (docItr.hasNext()) {
                 int docKey = (Integer) docItr.next();
                 totalPostMem = totalPostMem + 48 + 4 * mIndex.get(key).get(docKey).size();
+                totalPostingsSize++;
             }
         }
-        return hashMem + totalStrMem + totalPostListMem + totalPostMem;
+        totalMemory = hashMem + totalStrMem + totalPostListMem + totalPostMem;
     }
 }
