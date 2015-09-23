@@ -6,6 +6,8 @@
 package searchengine;
 
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.Set;
 import java.util.TreeMap;
 
 /**
@@ -16,6 +18,12 @@ public class PositionalInvertedIndex {
 
     private final TreeMap<String, TreeMap<Integer, ArrayList<Long>>> mIndex;
     private int longestWord;
+
+    // Variables for statistics
+    private long numberOfTerms;
+    private long numberOfTypes;
+    private long numberOfDocuments;
+    private long totalPostingsSize;
 
     /**
      * creates new mIndex which stores terms with document in which it occurs
@@ -91,5 +99,68 @@ public class PositionalInvertedIndex {
      */
     public int getLongestWordLength() {
         return longestWord;
+    }
+
+    /**
+     * @return the numberOfTerms
+     */
+    public long getNumberOfTerms() {
+        return numberOfTerms;
+    }
+
+    /**
+     * @return the numberOfTypes
+     */
+    public long getNumberOfTypes() {
+        return numberOfTypes;
+    }
+
+    /**
+     * @return the numberOfDocuments
+     */
+    public long getNumberOfDocuments() {
+        return numberOfDocuments;
+    }
+
+    /**
+     * @return the totalPostingsSize
+     */
+    public long getTotalPostingsSize() {
+        return totalPostingsSize;
+    }
+
+    // returns the average number of docs in the postings list of a term in the index.
+    public long averagePostings(int docs, int postings) {
+        return totalPostingsSize / numberOfDocuments;
+    }
+
+    // calculate and return total memory
+    public long totalMem() {
+        long hashMem = 24 + 36 * numberOfTerms;
+        long totalStrMem = 0;
+        long totalPostListMem = 0;
+        long totalPostMem = 0;
+        
+        Set keys = mIndex.keySet();
+        Iterator itr = keys.iterator();
+        while (itr.hasNext()) {
+            String key = (String) itr.next();
+            // calculate string memory
+            long strMem = 40;
+            strMem = strMem + 2 * key.length();
+            totalStrMem = totalStrMem + strMem;
+
+            //calculate total postings list memory
+            totalPostListMem = totalPostListMem + 24 + 36 * mIndex.get(key).size();
+
+            //calculate total posting memory
+            Set docKeys = mIndex.get(key).keySet();
+            Iterator docItr = docKeys.iterator();
+            while (docItr.hasNext()) {
+                int docKey = (Integer) docItr.next();
+                totalPostMem = totalPostMem + 48 + 4 * mIndex.get(key).get(docKey).size();
+            }
+        }
+        return hashMem + totalStrMem + totalPostListMem + totalPostMem;
     }
 }
