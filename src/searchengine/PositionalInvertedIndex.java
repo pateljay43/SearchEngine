@@ -11,6 +11,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.HashMap;
 
 /**
  *
@@ -19,11 +20,12 @@ import java.util.TreeMap;
 public class PositionalInvertedIndex {
 
     // <term,<docID,<p1,p2,...,pn>>>
-    private final TreeMap<String, TreeMap<Integer, ArrayList<Long>>> mIndex;
+    private final HashMap<String, TreeMap<Integer, ArrayList<Long>>> mIndex;
+    //private final HashMap<String, List<PositionalPosting>>
     private int longestWord;
 
     // Variables for statistics
-    private long totalPostingsSize;
+    private long totalDocumentCount;
     private long totalMemory;
 
     /**
@@ -31,7 +33,7 @@ public class PositionalInvertedIndex {
      * and positions where it occurs in that document
      */
     public PositionalInvertedIndex() {
-        mIndex = new TreeMap<>();
+        mIndex = new HashMap<>();
         longestWord = 0;
     }
 
@@ -110,10 +112,10 @@ public class PositionalInvertedIndex {
     }
 
     /**
-     * @return the totalPostingsSize
+     * @return the totalDocumentCount
      */
-    public long getTotalPostingsSize() {
-        return totalPostingsSize;
+    public long getTotalDocumentCount() {
+        return totalDocumentCount;
     }
 
     // statistics 
@@ -121,7 +123,7 @@ public class PositionalInvertedIndex {
         long totalStrMem = 0;
         long totalPostListMem = 0;
         long totalPostMem = 0;
-        totalPostingsSize = 0;
+        totalDocumentCount = 0;
 
         // set of all terms
         Set keys = mIndex.keySet();
@@ -137,7 +139,7 @@ public class PositionalInvertedIndex {
             totalStrMem = totalStrMem + strMem;
 
             //calculate total postings list memory
-            totalPostListMem = totalPostListMem + 24 + 36 * mIndex.get(key).size();
+            totalPostListMem = totalPostListMem + 24 + 8 * mIndex.get(key).size();
 
             //calculate total posting memory
             // set of all docID for 'key' term
@@ -146,7 +148,7 @@ public class PositionalInvertedIndex {
             while (docItr.hasNext()) {
                 int docKey = (Integer) docItr.next();
                 totalPostMem = totalPostMem + 48 + 4 * mIndex.get(key).get(docKey).size();
-                totalPostingsSize++;
+                totalDocumentCount++;
             }
         }
         totalMemory = hashMem + totalStrMem + totalPostListMem + totalPostMem;

@@ -16,7 +16,10 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Scanner;
+import java.util.Set;
 import java.util.TreeMap;
 
 /**
@@ -28,7 +31,7 @@ public class SearchEngine {
     private static PorterStemmer porterstemmer;
     private static int longestFile = 0;
     private static int mDocumentID = 0;
-//    private static int numberOfDocuments;
+    private static Set<String> types = new HashSet<>();
 
     public static void main(String[] args) throws IOException {
         final String folderName = "Search Space";
@@ -78,17 +81,18 @@ public class SearchEngine {
 
         });
 
-//        printResults(index, fileNames);
+//       printResults(index, fileNames);
         // do the statistics
-//        index.indexFinalize();
+        index.indexFinalize();
         // user's choice of showing statistics
         boolean showStatistics = true;
         if (showStatistics) {
             System.out.println("Number of Terms: " + index.getTermCount());
+            System.out.println("Number of Types (distinct tokens): " + types.size());
             System.out.println("Average number of documents per term: "
-                    + (long) index.getTotalPostingsSize() / mDocumentID);
+                    + ((double) index.getTotalDocumentCount()) / index.getTermCount());
             System.out.println("10 most frequent words statistics...");
-            ArrayList<String> mostFrequentTerms = index.mostFrequentTerms(10);
+            ArrayList<String> mostFrequentTerms = index.mostFrequentTerms(100);
             System.out.println("\t" + mostFrequentTerms);
             System.out.print("\t[");
             for (String key : mostFrequentTerms) {
@@ -97,31 +101,43 @@ public class SearchEngine {
             System.out.println("\b\b]");
             System.out.println("Approximate total memory requirement: " + index.getTotalMemory() + "bytes");
         }
-
         System.exit(0);
         Scanner scan = new Scanner(System.in);
-        String input;
-        String[] dictionary = index.getDictionary();;
+        String query;
+        // set of all keys
         ArrayList<Integer> postings;
         while (true) {
             System.out.print("Enter a query to search for: ");
-            input = scan.nextLine().trim().toLowerCase();
-            if (input.equalsIgnoreCase("quit")) {
+            query = scan.nextLine().trim();
+            if (query.equals("EXIT")) {
                 System.out.println("Bye!");
                 break;
             }
-            input = porterstemmer.processToken(input);
-            int searchIndex = Arrays.binarySearch(dictionary, input);
+            // replace extra space between tokens in query
+            query = query.replaceAll("(( )( )+)", " ");
+            // split query for OR operator
+            String[] tokens = query.split("\\+");
+            TreeMap<Integer, ArrayList<Long>> result = new TreeMap<>();
+            for (int i = 0; i < tokens.length; i++) {
+                tokens[i] = porterstemmer.processToken(tokens[i].trim());
+                Set<Integer> docIds = index.getPostings(tokens[i]).keySet();
+                Iterator<ArrayList<Long>> positionList = index.getPostings(tokens[i]).values().iterator();
+                docIds.stream().forEach((Integer id) -> {
+                    result.put(id, positionList.next());
+                });
+            }
+            System.exit(0);
+            int searchIndex = Arrays.binarySearch(dictionary, query);
             if (searchIndex < 0) {
                 System.out.println("No documents contain that term..!\n");
                 continue;
             }
-//            System.out.println("These documents contain that term:");
-//            postings = index.getPostings(dictionary[searchIndex]);
-//            for (Integer doc : postings) {
-//                System.out.print(fileNames.get(doc) + " ");
-//            }
-//            System.out.print("\b\n\n");
+            System.out.println("These documents contain that term:");
+            postings = index.getPostings(dictionary[searchIndex]);
+            for (Integer doc : postings) {
+                System.out.print(fileNames.get(doc) + " ");
+            }
+            System.out.print("\b\n\n");
         }
     }
 
@@ -148,6 +164,7 @@ public class SearchEngine {
         long position = 0;
         while (simpleTokenStream.hasNextToken()) {
             String term = simpleTokenStream.nextToken();
+            types.add(term);
             if (term.contains("-")) { // process term with '-'
                 // for ab-xy -> store (abxy, ab, xy) all three
                 // all with same position
