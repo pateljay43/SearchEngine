@@ -27,7 +27,8 @@ public class SearchEngine {
 
     private static PorterStemmer porterstemmer;
     private static int longestFile = 0;
-    private static int numberOfDocuments;
+    private static int mDocumentID = 0;
+//    private static int numberOfDocuments;
 
     public static void main(String[] args) throws IOException {
         final String folderName = "Search Space";
@@ -41,7 +42,6 @@ public class SearchEngine {
 
         // This is our standard "walk through all .txt files" code.
         Files.walkFileTree(currentWorkingPath, new SimpleFileVisitor<Path>() {
-            int mDocumentID = 0;
 
             @Override
             public FileVisitResult preVisitDirectory(Path dir,
@@ -65,7 +65,6 @@ public class SearchEngine {
                     fileNames.add(file.getFileName().toString());
                     indexFile(file.toFile(), index, mDocumentID);
                     mDocumentID++;
-                    numberOfDocuments++;
                 }
                 return FileVisitResult.CONTINUE;
             }
@@ -79,15 +78,23 @@ public class SearchEngine {
 
         });
 
-        printResults(index, fileNames);
+//        printResults(index, fileNames);
         // do the statistics
-        index.indexFinalize();
+//        index.indexFinalize();
         // user's choice of showing statistics
-        boolean isStatistics = true;
-        if(isStatistics){
+        boolean showStatistics = true;
+        if (showStatistics) {
             System.out.println("Number of Terms: " + index.getTermCount());
-            System.out.println("Average number of documents per term: " + (long) index.getTotalPostingsSize() / numberOfDocuments);
-            System.out.println("10 most frequent words statistics...IN PROGRESS");
+            System.out.println("Average number of documents per term: "
+                    + (long) index.getTotalPostingsSize() / mDocumentID);
+            System.out.println("10 most frequent words statistics...");
+            ArrayList<String> mostFrequentTerms = index.mostFrequentTerms(10);
+            System.out.println("\t" + mostFrequentTerms);
+            System.out.print("\t[");
+            for (String key : mostFrequentTerms) {
+                System.out.printf("%.2f, ", (double) index.getPostings(key).size() / mDocumentID);
+            }
+            System.out.println("\b\b]");
             System.out.println("Approximate total memory requirement: " + index.getTotalMemory() + "bytes");
         }
 
@@ -140,17 +147,21 @@ public class SearchEngine {
         }
         long position = 0;
         while (simpleTokenStream.hasNextToken()) {
-            String term = porterstemmer.processToken(simpleTokenStream.nextToken());
-            if (term.contains("-")) {   // process term with '-'
+            String term = simpleTokenStream.nextToken();
+            if (term.contains("-")) { // process term with '-'
                 // for ab-xy -> store (abxy, ab, xy) all three
                 // all with same position
-                index.addTerm(term.replaceAll("-", ""), docID, position);
+                index.addTerm(porterstemmer.processToken(term.replaceAll("-", "")),
+                        docID, position);
                 String[] subtokens = term.split("-");
                 for (String subtoken : subtokens) {
-                    index.addTerm(subtoken, docID, position);
+                    if (subtoken.length() > 0) {
+                        index.addTerm(porterstemmer.processToken(subtoken),
+                                docID, position);
+                    }
                 }
             } else {
-                index.addTerm(term, docID, position);
+                index.addTerm(porterstemmer.processToken(term), docID, position);
             }
             position++;
         }
@@ -200,8 +211,7 @@ public class SearchEngine {
     /**
      * @return the numberOfDocuments
      */
-    public long getNumberOfDocuments() {
-        return numberOfDocuments;
-    }
-    
+//    public long getNumberOfDocuments() {
+//        return numberOfDocuments;
+//    }
 }

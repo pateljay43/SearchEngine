@@ -6,6 +6,8 @@
 package searchengine;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeMap;
@@ -16,6 +18,7 @@ import java.util.TreeMap;
  */
 public class PositionalInvertedIndex {
 
+    // <term,<docID,<p1,p2,...,pn>>>
     private final TreeMap<String, TreeMap<Integer, ArrayList<Long>>> mIndex;
     private int longestWord;
 
@@ -105,22 +108,24 @@ public class PositionalInvertedIndex {
     public long getTotalMemory() {
         return totalMemory;
     }
-    
+
     /**
      * @return the totalPostingsSize
      */
     public long getTotalPostingsSize() {
         return totalPostingsSize;
     }
-    
+
     // statistics 
-    public void indexFinalize() {       
+    public void indexFinalize() {
         long totalStrMem = 0;
         long totalPostListMem = 0;
         long totalPostMem = 0;
         totalPostingsSize = 0;
-        
+
+        // set of all terms
         Set keys = mIndex.keySet();
+
         // calculate total hash memory
         long hashMem = 24 + 36 * mIndex.size();
         Iterator itr = keys.iterator();
@@ -135,6 +140,7 @@ public class PositionalInvertedIndex {
             totalPostListMem = totalPostListMem + 24 + 36 * mIndex.get(key).size();
 
             //calculate total posting memory
+            // set of all docID for 'key' term
             Set docKeys = mIndex.get(key).keySet();
             Iterator docItr = docKeys.iterator();
             while (docItr.hasNext()) {
@@ -144,5 +150,33 @@ public class PositionalInvertedIndex {
             }
         }
         totalMemory = hashMem + totalStrMem + totalPostListMem + totalPostMem;
+    }
+
+    /**
+     * find k most frequent terms from the index
+     *
+     * @param k must be greater than 1
+     * @return list of 10 most frequent terms (first term will be most frequent,
+     * last will be least frequent)
+     */
+    public ArrayList<String> mostFrequentTerms(int k) {
+        ArrayList<String> mostfreq = new ArrayList<String>(k);
+        for (int i = 0; i < k; i++) {
+            int maxSize = 0;
+            String maxSize_Key = null;
+            Iterator<String> keys = mIndex.keySet().iterator();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                int numOfDocs = mIndex.get(key).size();
+                if (numOfDocs > maxSize && !mostfreq.contains(key)) {
+                    maxSize = numOfDocs;
+                    maxSize_Key = key;
+                }
+            }
+            if (maxSize_Key != null) {
+                mostfreq.add(i, maxSize_Key);
+            }
+        }
+        return mostfreq;
     }
 }

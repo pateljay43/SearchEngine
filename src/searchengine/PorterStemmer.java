@@ -5,81 +5,124 @@
  */
 package searchengine;
 
-import java.util.Scanner;
+import java.util.HashMap;
 import java.util.regex.*;
 
 public class PorterStemmer {
 
+    /**
+     * key - penultimate letter of suffix. value - array of suffix,replacement
+     * pairs lined together.
+     */
+    private final HashMap<Character, String[]> step2pairs;
+    /**
+     * key - last letter of suffix. value - array of suffix,replacement pairs
+     * lined together.
+     */
+    private final HashMap<Character, String[]> step3pairs;
+    /**
+     * key - penultimate letter of suffix. value - array of suffix,replacement
+     * pairs lined together.
+     */
+    private final HashMap<Character, String[]> step4pairs;
     // a single consonant
-    private static final String c = "[^aeiou]";
+    private final String c;
     // a single vowel
-    private static final String v = "[aeiouy]";
+    private final String v;
 
     // a sequence of consonants; the second/third/etc consonant cannot be 'y'
-    private static final String C = c + "[^aeiouy]*";
+    private final String C;
     // a sequence of vowels; the second/third/etc cannot be 'y'
-    private static final String V = v + "[aeiou]*";
+    private final String V;
 
     // this regex pattern tests if the token has measure > 0 [at least one VC].
-    private static final Pattern mGr0 = Pattern.compile("^(" + C + ")?" + V + C);
+    private final Pattern mGr0;
 
-    //private static final Pattern mGr0 = Pattern.compile("^(" + C + ")?" +
+    //private final Pattern mGr0 = Pattern.compile("^(" + C + ")?" +
     //"(" + V + C + ")+(" + V + ")?");
     // add more Pattern variables for the following patterns:
     // m equals 1: token has measure == 1
-    private static final Pattern mEq1 = Pattern.compile("^(" + C + ")?" + "(" + V + C + ")" + "(" + V + ")?$");
+    private final Pattern mEq1;
     // m greater than 1: token has measure > 1
-    private static final Pattern mGr1 = Pattern.compile("^(" + C + ")?" + V + C + V + C);
+    private final Pattern mGr1;
     // vowel: token has a vowel after the first (optional) C
-    private static final Pattern ConVow = Pattern.compile("^(" + V + ")?" + c + v);
+    private final Pattern containVowel;
     // double consonant: token ends in two consonants that are the same,
-    private static final String last_c1 = "[^aeioulsz]$";
-    private static final Pattern doubleCon = Pattern.compile("\\z(" + last_c1 + ")\1{2,}");
     //			unless they are L, S, or Z. (look up "backreferencing" to help 
     //			with this)
+    private final String dC;
+//    private final Pattern doubleCon = Pattern.compile("(?i)\\w+(?:(?![aeioulsz])[a-z]){2}$");
+    private final Pattern notLSZ;
     // m equals 1, Cvc: token is in Cvc form, where the last c is not w, x, 
     //			or y.
-    private static final String last_c2 = "[^aeiouwxy]$";
-    private static final Pattern cvc = Pattern.compile("^(" + c + ")" + "(" + v + c + ")" + last_c2 + "$");
+//    private final String last_c2 = "[^aeiouwxy]$";
+    private final Pattern o;
     // has a vowel
-    private final static Pattern pV = Pattern.compile(v);
+//    private final Pattern pV = Pattern.compile(v);
 
-    public static void main(String[] args) {
-        // Test Porter Stemmer 
-        // Read a string from the keyboard
-        Scanner scan = new Scanner(System.in);
-        String s = scan.next();
-        while (!s.equals("quit")) {
-            // Print the stemmed string
-            System.out.print(processToken(s) + " ");
-            s = scan.next();
-        }
-        scan.close();
+    public PorterStemmer() {
+        c = "[^aeiou]";
+        v = "[aeiouy]";
+        C = c + "[^aeiouy]*";
+        V = v + "[aeiou]*";
+        mGr0 = Pattern.compile("^(" + C + ")?" + V + C);
+        mEq1 = Pattern.compile("^(" + C + ")?" + "(" + V + C + ")" + "(" + V + ")?$");
+        mGr1 = Pattern.compile("^(" + C + ")?" + V + C + V + C);
+        containVowel = Pattern.compile("^(" + C + ")?(" + V + ")+.*");
+        dC = "(.)*(" + c + ")\\2$";
+        notLSZ = Pattern.compile(".*[^lsz]$");
+        o = Pattern.compile("^(" + C + ")" + "(" + v + ")[^aeiouwxy]$");
+        step2pairs = new HashMap() {
+            {
+                put('a', new String[]{"ational", "ate", "tional", "tion"});
+                put('c', new String[]{"enci", "ence", "anci", "ance"});
+                put('e', new String[]{"izer", "ize"});
+                put('l', new String[]{"abli", "able", "alli", "al", "entli", "ent", "eli", "e", "ousli", "ous"});
+                put('o', new String[]{"ization", "ize", "ation", "ate", "ator", "ate"});
+                put('s', new String[]{"alism", "al", "iveness", "ive", "fulness", "ful", "ousness", "ous"});
+                put('t', new String[]{"aliti", "al", "iviti", "ive", "biliti", "ble"});
+            }
+        };
+        step3pairs = new HashMap() {
+            {
+                put('e', new String[]{"icate", "ic", "ative", "", "alize", "al"});
+                put('i', new String[]{"iciti", "ic"});
+                put('l', new String[]{"ical", "ic", "ful", ""});
+                put('s', new String[]{"ness", ""});
+            }
+        };
+        step4pairs = new HashMap() {
+            {
+                put('a', new String[]{"al", ""});
+                put('c', new String[]{"ance", "", "ence", ""});
+                put('e', new String[]{"er", ""});
+                put('i', new String[]{"ic", ""});
+                put('l', new String[]{"able", "", "ible", ""});
+                put('n', new String[]{"ant", "", "ement", "", "ment", "", "ent", ""});
+                put('o', new String[]{"sion", "", "tion", "", "ou", ""});
+                put('s', new String[]{"ism", ""});
+                put('t', new String[]{"ate", "", "iti", ""});
+                put('u', new String[]{"ous", ""});
+                put('v', new String[]{"ive", ""});
+                put('z', new String[]{"ize", ""});
+            }
+        };
     }
 
-    public static String processToken(String token) {
-        //System.out.println(mGr0.pattern());
+    public String processToken(String token) {
         if (token.length() < 3) {
             return token; // token must be at least 3 chars
         }
         // step 1a
-        // program the other steps in 1a. 
-        // note that Step 1a.3 implies that there is only a single 's' as the 
-        //	suffix; ss does not count. you may need a regex pattern here for 
-        // "not s followed by s".
         Pattern p_s = Pattern.compile("(.+[^s])s$");
-        Matcher m_s = p_s.matcher(token);
-        if (token.endsWith("sses")) {
+        if (token.endsWith("sses") || token.endsWith("ies")) {
             token = token.substring(0, token.length() - 2);
-        } else if (token.endsWith("ies")) {
-            token = token.substring(0, token.length() - 2);
-        } else if (m_s.matches()) {
+        } else if (p_s.matcher(token).find()) {
             token = token.substring(0, token.length() - 1);
         }
 
         // step 1b
         boolean doStep1bb = false;
-        //		step 1b
         if (token.endsWith("eed")) { // 1b.1
             // token.substring(0, token.length() - 3) is the stem prior to "eed".
             // if that has m>0, then remove the "d".
@@ -87,18 +130,16 @@ public class PorterStemmer {
             if (mGr0.matcher(stem).find()) { // if the pattern matches the stem
                 token = stem + "ee";
             }
-        } //              step1b.2
-        else if (token.endsWith("ed")) {
+        } else if (token.endsWith("ed")) {
             doStep1bb = true;
             String stem = token.substring(0, token.length() - 2);
-            if (pV.matcher(stem).find()) {
+            if (containVowel.matcher(stem).find()) {
                 token = stem;
             }
-        } //             step1b.3
-        else if (token.endsWith("ing")) {
+        } else if (token.endsWith("ing")) {
             doStep1bb = true;
             String stem = token.substring(0, token.length() - 3);
-            if (pV.matcher(stem).find()) {
+            if (containVowel.matcher(stem).find()) {
                 token = stem;
             }
         }
@@ -106,100 +147,72 @@ public class PorterStemmer {
         // step 1b*, only if the 1b.2 or 1b.3 were performed.
         if (doStep1bb) {
             if (token.endsWith("at") || token.endsWith("bl")
-                    || token.endsWith("iz")) {
-
+                    || token.endsWith("iz")
+                    || (mEq1.matcher(token).find() && o.matcher(token).find())) {
                 token = token + "e";
-            } else if (doubleCon.matcher(token).find()) {
+            } else if (token.matches(dC) && notLSZ.matcher(token).find()) {
                 token = token.substring(0, token.length() - 1);
-            } else if (cvc.matcher(token).find()) {
-                token = token + "e";
             }
-            // use the regex patterns you wrote for 1b*.4 and 1b*.5
         }
 
         // step 1c
-        // program this step. test the suffix of 'y' first, then test the 
-        // condition *v*.
         if (token.endsWith("y")) {
-            if (pV.matcher(token).find()) {
-                token = token.substring(0, token.length() - 1) + "i";
+            String stem = token.substring(0, token.length() - 1);
+            if (containVowel.matcher(stem).find()) {
+                token = stem + "i";
             }
         }
         // step 2
-        // program this step. for each suffix, see if the token ends in the 
-        // suffix. 
-        //		* if it does, extract the stem, and do NOT test any other suffix.
-        //    * take the stem and make sure it has m > 0.
-        //			* if it does, complete the step. if it does not, do not 
-        //				attempt any other suffix.
-        // you may want to write a helper method for this. a matrix of 
-        // "suffix"/"replacement" pairs might be helpful. It could look like
-        // string[][] step2pairs = {  new string[] {"ational", "ate"}, 
-        // new string[] {"tional", "tion"}, ....
-        String[][] step2pairs = {new String[]{"ational", "ate"}, new String[]{"tional", "tion"}, new String[]{"enci", "ence"}, new String[]{"anci", "ance"}, new String[]{"izer", "ize"}, new String[]{"abli", "able"}, new String[]{"alli", "al"}, new String[]{"entli", "ent"}, new String[]{"eli", "e"}, new String[]{"ousli", "ous"}, new String[]{"ization", "ize"}, new String[]{"ation", "ate"}, new String[]{"ator", "ate"}, new String[]{"alism", "al"}, new String[]{"iveness", "ive"}, new String[]{"fulness", "ful"}, new String[]{"ousness", "ous"}, new String[]{"aliti", "al"}, new String[]{"iviti", "ive"}, new String[]{"biliti", "ble"}};
-
-        for (int i = 0; i < step2pairs.length; i++) {
-            if (token.endsWith(step2pairs[i][0])) {
-                int length = step2pairs[i][0].length();
-                String stem = token.substring(0, token.length() - length);
-                if (mGr0.matcher(stem).find()) {
-                    token = stem + step2pairs[i][1];
-                    break;
-                }
-            }
-        }
+        token = stepHelper(token, step2pairs, mGr0, 2, false);
 
         // step 3
-        // program this step. the rules are identical to step 2 and you can use
-        // the same helper method. you may also want a matrix here.
-        String[][] step3pairs = {new String[]{"icate", "ic"}, new String[]{"ative", ""}, new String[]{"alize", "al"}, new String[]{"iciti", "ic"}, new String[]{"ical", "ic"}, new String[]{"ful", ""}, new String[]{"ness", ""}};
-        for (int i = 0; i < step3pairs.length; i++) {
-            if (token.endsWith(step3pairs[i][0])) {
-                int length = step3pairs[i][0].length();
-                String stem = token.substring(0, token.length() - length);
-                if (mGr0.matcher(stem).find()) {
-                    token = stem + step3pairs[i][1];
-                    break;
-                }
-            }
-        }
+        token = stepHelper(token, step3pairs, mGr0, 1, false);
+
         // step 4
-        // program this step similar to step 2/3, except now the stem must have
-        // measure > 1.
-        // note that ION should only be removed if the suffix is SION or TION, 
-        // which would leave the S or T.
-        // as before, if one suffix matches, do not try any others even if the 
-        // stem does not have measure > 1.
-        String[][] step4pairs = {new String[]{"al", ""}, new String[]{"ance", ""}, new String[]{"ence", ""}, new String[]{"er", ""}, new String[]{"ic", ""}, new String[]{"able", ""}, new String[]{"ible", ""}, new String[]{"ant", ""}, new String[]{"ement", ""}, new String[]{"ment", ""}, new String[]{"ent", ""}, new String[]{"sion", "s"}, new String[]{"tion", "t"}, new String[]{"ou", ""}, new String[]{"ism", ""}, new String[]{"ate", ""}, new String[]{"iti", ""}, new String[]{"ous", ""}, new String[]{"ive", ""}, new String[]{"ize", ""}};
-        for (int i = 0; i < step4pairs.length; i++) {
-            if (token.endsWith(step4pairs[i][0])) {
-                int length = step4pairs[i][0].length();
-                String stem = token.substring(0, token.length() - length);
-                if (mGr1.matcher(stem).find()) {
-                    token = stem + step4pairs[i][1];
-                    break;
+        token = stepHelper(token, step4pairs, mGr1, 2, true);
+
+        // step 5
+        if (token.endsWith("e")) {
+            String stem = token.substring(0, token.length() - 1);
+            if (mGr1.matcher(stem).find() || (mEq1.matcher(stem).find() && !o.matcher(stem).find())) {
+                token = stem;
+            }
+        }
+        if (mGr1.matcher(token).find() && token.matches(dC) && token.endsWith("l")) {
+            token = token.substring(0, token.length() - 1);
+        }
+
+        return token;
+    }
+
+    /**
+     *
+     * @param _token - token to be processed
+     * @param _pairs - current step (suffix,replacement) pairs
+     * @param _measure - measure to be compared with stem of token
+     * @param _penultimatePos - position of token's character to be compared to
+     * @param _exception - exception for *sion and *tion in step 4, s or t will
+     * be included in stem before measure get (_pairs)
+     * @return
+     */
+    private String stepHelper(String _token, HashMap<Character, String[]> _pairs,
+            Pattern _measure, int _penultimatePos, boolean _exception) {
+        if (_token.length() >= 4) {      // minimum length out of all suffix is 2 and for m>0 -> atleast 2 chars
+            String[] pair = _pairs.getOrDefault(
+                    _token.charAt(_token.length() - _penultimatePos),
+                    new String[0]);
+            for (int i = 0; i < pair.length; i = i + 2) {
+                if (_token.endsWith(pair[i])) {
+                    String stem = _token.substring(0, _token.length() - pair[i].length());
+                    if (_exception && (pair[i].startsWith("s") || pair[i].startsWith("t"))) {
+                        stem = stem + pair[i].charAt(0);
+                    }
+                    if (_measure.matcher(stem).find()) {
+                        return (stem + pair[i + 1]);
+                    }
                 }
             }
         }
-        // step 5
-        // program this step. you have a regex for m=1 and for "Cvc", which
-        // you can use to see if m=1 and NOT Cvc.
-        if (mGr1.matcher(token).find()) {
-            if (token.endsWith("e")) {
-                token = token.substring(0, token.length() - 1);
-            }
-        } else if (mEq1.matcher(token).find() && !cvc.matcher(token).find()) {
-            if (token.endsWith("e")) {
-                token = token.substring(0, token.length() - 1);
-            }
-        }
-        if (mGr1.matcher(token).find() && doubleCon.matcher(token).find()) {
-            if (token.endsWith("ll")) {
-                token = token.substring(0, token.length() - 1);
-            }
-        }
-        // all your code should change the variable token, which represents
-        // the stemmed term for the token.
-        return token;
+        return _token;
     }
 }
