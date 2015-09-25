@@ -160,7 +160,7 @@ public class SearchEngine {
         while (true) {
             System.out.print("Enter a query to search for: ");
             // remove extra space if any in query
-            query = scan.nextLine().trim().replaceAll("(( )( )+)", " ");
+            query = scan.nextLine().trim();
             if (query.equals("")) {
                 System.out.println("Please Enter a search query!");
                 continue;
@@ -171,8 +171,10 @@ public class SearchEngine {
             }
             TreeSet<String> result = new TreeSet<>();
             SimpleTokenStream querystream = new SimpleTokenStream(query);
+            Set<String> negationTokens = new HashSet<>();
             while (querystream.hasNextToken()) {
                 String token = querystream.nextToken(true);
+                // check for phrase query
                 if (token.startsWith("\"")) {
                     ArrayList<String> phrasetokens = new ArrayList<>();
                     phrasetokens.add(porterstemmer.
@@ -190,9 +192,15 @@ public class SearchEngine {
                     }
                     // phrasetoken has all the tokens inorder to be processed
                     result.addAll(processPhrase(phrasetokens));
+                } else if (token.startsWith("-")) {
+                    negationTokens.add(
+                            porterstemmer.processToken(token.substring(1, token.length())));
                 } else {
                     result.addAll(processOR(porterstemmer.processToken(token)));
                 }
+            }
+            if (!negationTokens.isEmpty()) {
+                result.removeAll(processNegation(negationTokens));
             }
             if (result.isEmpty()) {
                 System.out.println("No documents contain that term..!\n");
@@ -204,6 +212,25 @@ public class SearchEngine {
             });
             System.out.print("\b\n\n");
         }
+    }
+
+    /**
+     * process NOT queries - tokens containing '-'
+     *
+     * @param negationTokens
+     */
+    private static Set<String> processNegation(Set<String> negationTokens) {
+        Set<Integer> docIds = new HashSet<>();
+        Iterator<String> nToken = negationTokens.iterator();
+        while (nToken.hasNext()) {
+            docIds.addAll(index.getPostings(nToken.next()).keySet());
+        }
+        Iterator<Integer> iterator = docIds.iterator();
+        Set<String> nDocument = new HashSet<>();
+        while (iterator.hasNext()) {
+            nDocument.add(fileNames.get(iterator.next()));
+        }
+        return nDocument;
     }
 
     /**
