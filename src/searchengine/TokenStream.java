@@ -10,7 +10,7 @@ public interface TokenStream {
      * Returns the next token from the stream, or null if there is no token
      * available.
      */
-    String nextToken();
+    String nextToken(boolean query);
 
     /**
      * Returns true if the stream has tokens remaining.

@@ -27,7 +27,7 @@ public class SimpleTokenStream implements TokenStream {
      * @param text stream tokens from given text
      */
     public SimpleTokenStream(String text) {
-        mReader = new Scanner(text);
+        mReader = new Scanner(text.replaceAll("\\+", " + ").replaceAll("(( )( )+)", " "));
     }
 
     /**
@@ -44,28 +44,34 @@ public class SimpleTokenStream implements TokenStream {
      * Returns the next token from the stream, or null if there is no token
      * available.
      *
+     * @param query is this stream for query
      * @return next token
      */
     @Override
-    public String nextToken() {
+    public String nextToken(boolean query) {
         if (!hasNextToken()) {
             return null;
         }
         // remove any non-alphanumeric excluding '-'
-        String next = mReader.next().replaceAll("[^A-Za-z0-9-]", "").toLowerCase();
-        // remove any preceding '-'
-        while (next.startsWith("-")) {
-            next = next.replaceFirst("-", "");
-        }
-        // remove any '-' at the end
-        while (next.endsWith("-")) {
-            next = next.substring(0, next.lastIndexOf("-"));
+        String next = mReader.next();
+
+        if (!query) {    // remove any preceding '-'
+            next = next.replaceAll("[^A-Za-z0-9-]", "").toLowerCase();
+            while (next.startsWith("-")) {
+                next = next.replaceFirst("-", "");
+            }
+            // remove any '-' at the end
+            while (next.endsWith("-")) {
+                next = next.substring(0, next.lastIndexOf("-"));
+            }
+        } else {
+            next = next.replaceAll("[^A-Za-z0-9-+ \"]", "").toLowerCase();
         }
         if (next.length() > 0) {
             return next;
         } else if (hasNextToken()) {
-            nextToken();
+            next = nextToken(query);
         }
-        return null;
+        return next;
     }
 }
