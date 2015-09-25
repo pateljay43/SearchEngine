@@ -234,7 +234,7 @@ public class SearchEngine {
     }
 
     /**
-     * process the phrase query containing 'phrasetokens' tokens
+     * process the phrase query inside double quotes
      *
      * @param phrasetokens
      * @return
