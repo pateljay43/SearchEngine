@@ -172,10 +172,13 @@ public class SearchEngine {
             TreeSet<String> result = new TreeSet<>();
             SimpleTokenStream querystream = new SimpleTokenStream(query);
             Set<String> negationTokens = new HashSet<>();
-            while (querystream.hasNextToken()) {
+            boolean done = false;
+            boolean containsPositive = false;
+            while (querystream.hasNextToken() && !done) {
                 String token = querystream.nextToken(true);
                 // check for phrase query
                 if (token.startsWith("\"")) {
+                    containsPositive = true;
                     ArrayList<String> phrasetokens = new ArrayList<>();
                     phrasetokens.add(porterstemmer.
                             processToken(token.substring(1, token.length())));
@@ -192,26 +195,61 @@ public class SearchEngine {
                     }
                     // phrasetoken has all the tokens inorder to be processed
                     result.addAll(processPhrase(phrasetokens));
-                } else if (token.startsWith("-")) {
+                } else if (token.startsWith("-")) { // NOT
                     negationTokens.add(
                             porterstemmer.processToken(token.substring(1, token.length())));
-                } else {
-                    result.addAll(processOR(porterstemmer.processToken(token)));
+                } else if ((token.equals("+") && querystream.hasNextToken())
+                        || !containsPositive) { // OR
+                    if (!containsPositive) {
+                        result.addAll(processOR(porterstemmer.processToken(token)));
+                        containsPositive = true;
+                    } else {
+                        token = querystream.nextToken(true);
+                        if (token.equals("+")) {
+                            done = true;
+                            break;
+                        } else {
+                            result.addAll(processOR(porterstemmer.processToken(token)));
+                        }
+                    }
+                } else { // AND
+                    containsPositive = true;
+                    Set<String> processAnd = processAnd(token);
+                    Iterator<String> iterator = result.iterator();
+                    if (!processAnd.isEmpty()) {
+                        ArrayList<String> delete = new ArrayList<>();
+                        while (iterator.hasNext()) {
+                            String doc = iterator.next();
+                            if (!processAnd.contains(doc)) {
+                                delete.add(doc);
+                            }
+                        }
+                        result.removeAll(delete);
+                    }
                 }
             }
             if (!negationTokens.isEmpty()) {
                 result.removeAll(processNegation(negationTokens));
             }
             if (result.isEmpty()) {
-                System.out.println("No documents contain that term..!\n");
+                System.out.println("No documents satisfies that query..!\n");
                 continue;
             }
-            System.out.println("These documents contain that term:");
+            System.out.println("These documents satisfies that query:");
             result.stream().forEach((String doc) -> {
                 System.out.print(doc + " ");
             });
             System.out.print("\b\n\n");
         }
+    }
+
+    private static Set<String> processAnd(String token) {
+        Set<String> documentIds = new HashSet<>();
+        Set<Integer> docIds = index.getPostings(token).keySet();
+        docIds.stream().forEach((Integer id) -> {
+            documentIds.add(fileNames.get(id));
+        });
+        return documentIds;
     }
 
     /**
