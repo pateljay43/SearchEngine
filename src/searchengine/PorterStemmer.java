@@ -182,7 +182,7 @@ public class PorterStemmer {
             token = token.substring(0, token.length() - 1);
         }
 
-        return token;
+        return token.trim();
     }
 
     /**

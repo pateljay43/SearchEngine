@@ -15,14 +15,10 @@ import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Objects;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
 
 /**
  *
@@ -87,11 +83,44 @@ public class SearchEngine {
 
         });
 
-//        printIndex(index, fileNames);
+//        printIndex(index);
         index.indexFinalize();
         printStatistics();
-
         processQueries();
+    }
+
+    /**
+     * starts waiting for queries from user and gives response accordingly until
+     * user types 'EXIT'
+     */
+    private static void processQueries() {
+        Scanner scan = new Scanner(System.in);
+        String query;
+        // set of all keys
+        while (true) {
+            System.out.print("Enter a query to search for: ");
+            // remove extra space if any in query
+            query = scan.nextLine().trim();
+            if (query.equals("")) {
+                System.out.println("Please Enter a search query!");
+                continue;
+            }
+            if (query.equals("EXIT")) {
+                System.out.println("Bye!");
+                break;
+            }
+            QueryProcessor queryProcessor = new QueryProcessor(index);
+            Set<Integer> resultDocIDs = queryProcessor.processQuery(query);
+            if (resultDocIDs.isEmpty()) {
+                System.out.println("No documents satisfies that query..!\n");
+                continue;
+            }
+            System.out.println("These documents satisfies that query:");
+            resultDocIDs.stream().forEach((Integer docId) -> {
+                System.out.print(fileNames.get(docId) + " ");
+            });
+            System.out.print("\b\n\n");
+        }
     }
 
     /**
@@ -116,7 +145,7 @@ public class SearchEngine {
         }
         long position = 0;
         while (simpleTokenStream.hasNextToken()) {
-            String term = simpleTokenStream.nextToken(false);
+            String term = simpleTokenStream.nextToken();
             types.add(term);
             if (term.contains("-")) { // process term with '-'
                 // for ab-xy -> store (abxy, ab, xy) all three
@@ -137,13 +166,17 @@ public class SearchEngine {
         }
     }
 
+    /**
+     * # of Terms, # of Types, Average number of documents per term, 10 most
+     * frequent terms, Approximate total memory required by index
+     */
     private static void printStatistics() {
         System.out.println("Number of Terms: " + index.getTermCount());
         System.out.println("Number of Types (distinct tokens): " + types.size());
         System.out.println("Average number of documents per term: "
                 + ((double) index.getTotalDocumentCount()) / index.getTermCount());
         System.out.println("10 most frequent words statistics...");
-        ArrayList<String> mostFrequentTerms = index.mostFrequentTerms(100);
+        ArrayList<String> mostFrequentTerms = index.mostFrequentTerms(10);
         System.out.println("\t" + mostFrequentTerms);
         System.out.print("\t[");
         for (String key : mostFrequentTerms) {
@@ -153,273 +186,6 @@ public class SearchEngine {
         System.out.println("Approximate total memory requirement: " + index.getTotalMemory() + "bytes");
     }
 
-    private static void processQueries() {
-        Scanner scan = new Scanner(System.in);
-        String query;
-        // set of all keys
-        while (true) {
-            System.out.print("Enter a query to search for: ");
-            // remove extra space if any in query
-            query = scan.nextLine().trim();
-            if (query.equals("")) {
-                System.out.println("Please Enter a search query!");
-                continue;
-            }
-            if (query.equals("EXIT")) {
-                System.out.println("Bye!");
-                break;
-            }
-            TreeSet<String> result = new TreeSet<>();
-            SimpleTokenStream querystream = new SimpleTokenStream(query);
-            Set<String> negationTokens = new HashSet<>();
-            boolean done = false;
-            boolean containsPositive = false;
-            while (querystream.hasNextToken() && !done) {
-                String token = querystream.nextToken(true);
-                // check for phrase query
-                if (token.startsWith("\"")) {
-                    containsPositive = true;
-                    ArrayList<String> phrasetokens = new ArrayList<>();
-                    phrasetokens.add(porterstemmer.
-                            processToken(token.substring(1, token.length())));
-                    boolean quit = false;
-                    while (querystream.hasNextToken() && !quit) {
-                        token = querystream.nextToken(true);
-                        if (token.endsWith("\"")) {
-                            phrasetokens.add(porterstemmer
-                                    .processToken(token.substring(0, token.length() - 1)));
-                            quit = true;
-                        } else {
-                            phrasetokens.add(porterstemmer.processToken(token));
-                        }
-                    }
-                    // phrasetoken has all the tokens inorder to be processed
-                    result.addAll(processPhrase(phrasetokens));
-                } else if (token.startsWith("-")) { // NOT
-                    negationTokens.add(
-                            porterstemmer.processToken(token.substring(1, token.length())));
-                } else if ((token.equals("+") && querystream.hasNextToken())
-                        || !containsPositive) { // OR
-                    if (!containsPositive) {
-                        result.addAll(processOR(porterstemmer.processToken(token)));
-                        containsPositive = true;
-                    } else {
-                        token = querystream.nextToken(true);
-                        if (token.equals("+")) {
-                            done = true;
-                            break;
-                        } else {
-                            result.addAll(processOR(porterstemmer.processToken(token)));
-                        }
-                    }
-                } else { // AND
-                    containsPositive = true;
-                    Set<String> processAnd = processAnd(token);
-                    Iterator<String> iterator = result.iterator();
-                    if (!processAnd.isEmpty()) {
-                        ArrayList<String> delete = new ArrayList<>();
-                        while (iterator.hasNext()) {
-                            String doc = iterator.next();
-                            if (!processAnd.contains(doc)) {
-                                delete.add(doc);
-                            }
-                        }
-                        result.removeAll(delete);
-                    }
-                }
-            }
-            if (!negationTokens.isEmpty()) {
-                result.removeAll(processNegation(negationTokens));
-            }
-            if (result.isEmpty()) {
-                System.out.println("No documents satisfies that query..!\n");
-                continue;
-            }
-            System.out.println("These documents satisfies that query:");
-            result.stream().forEach((String doc) -> {
-                System.out.print(doc + " ");
-            });
-            System.out.print("\b\n\n");
-        }
-    }
-
-    private static Set<String> processAnd(String token) {
-        Set<String> documentIds = new HashSet<>();
-        Set<Integer> docIds = index.getPostings(token).keySet();
-        docIds.stream().forEach((Integer id) -> {
-            documentIds.add(fileNames.get(id));
-        });
-        return documentIds;
-    }
-
-    /**
-     * process NOT queries - tokens containing '-'
-     *
-     * @param negationTokens
-     */
-    private static Set<String> processNegation(Set<String> negationTokens) {
-        Set<Integer> docIds = new HashSet<>();
-        Iterator<String> nToken = negationTokens.iterator();
-        while (nToken.hasNext()) {
-            docIds.addAll(index.getPostings(nToken.next()).keySet());
-        }
-        Iterator<Integer> iterator = docIds.iterator();
-        Set<String> nDocument = new HashSet<>();
-        while (iterator.hasNext()) {
-            nDocument.add(fileNames.get(iterator.next()));
-        }
-        return nDocument;
-    }
-
-    /**
-     * process the phrase query inside double quotes
-     *
-     * @param phrasetokens
-     * @return
-     */
-    private static Set<String> processPhrase(ArrayList<String> phrasetokens) {
-        TreeSet<String> result = new TreeSet<>();
-        String[] terms = phrasetokens.toArray(new String[phrasetokens.size()]);
-        String term1 = terms[0];
-        HashMap<Integer, Set<Long>> docId_Positions = new HashMap<>();
-        for (int i = 1; i < terms.length; i++) {
-            String term2 = terms[i];
-            HashMap<Integer, Set<Long>> pairs = matchTerms(term1, term2);
-            Iterator<Integer> iterator = pairs.keySet().iterator();
-            while (iterator.hasNext()) {
-                Integer docId = iterator.next();
-                Set<Long> values = docId_Positions.getOrDefault(docId, new HashSet<>());
-                values.addAll(pairs.get(docId));
-                docId_Positions.put(docId, values);
-            }
-            term1 = term2;
-        }
-        Iterator<Integer> iterator = docId_Positions.keySet().iterator();
-        while (iterator.hasNext()) {
-            Integer docId = iterator.next();
-            Iterator<Long> positions = docId_Positions.get(docId).iterator();
-            Long last = null;
-            int count = 0;
-            while (positions.hasNext()) {
-                Long next = positions.next();
-                if (last == null) {
-                    last = next;
-                    count++;
-                } else {
-                    if (last + 1 == next) {
-                        count++;
-                    } else {
-                        count = 0;
-                    }
-                    last = next;
-                }
-            }
-            if (count == phrasetokens.size()) {
-                result.add(fileNames.get(docId));
-            }
-        }
-        return result;
-    }
-
-    /**
-     * matches given terms in any document in the order "term1 term2"
-     *
-     * @param term1
-     * @param term2
-     * @return <documentId, all positions where "term1 term2" occured>
-     */
-    private static HashMap<Integer, Set<Long>> matchTerms(String term1, String term2) {
-        HashMap<Integer, Set<Long>> result = new HashMap<>();
-        Iterator<Integer> term1_DocIds = index.getPostings(term1).keySet().iterator();
-        Iterator<Integer> term2_DocIds = index.getPostings(term2).keySet().iterator();
-        Integer term1_DocId = null;
-        Integer term2_DocId = null;
-        if (term1_DocIds.hasNext() && term2_DocIds.hasNext()) {
-            term1_DocId = term1_DocIds.next();
-            term2_DocId = term2_DocIds.next();
-            boolean quit = false;
-            while (!quit) {
-                if (Objects.equals(term1_DocId, term2_DocId)) {
-                    Iterator<Long> term1_DocId_posList = index.getPositionalList(term1, term1_DocId).iterator();
-                    Iterator<Long> term2_DocId_posList = index.getPositionalList(term2, term2_DocId).iterator();
-                    if (term1_DocId_posList.hasNext() && term2_DocId_posList.hasNext()) {
-                        Long p1 = term1_DocId_posList.next();
-                        Long p2 = term2_DocId_posList.next();
-                        while (true) {
-                            if (Objects.equals(p1 + 1, p2)) {
-                                Set<Long> values = result.getOrDefault(term2_DocId, new HashSet<>());
-                                values.add(p1);
-                                values.add(p2);
-                                result.put(term2_DocId, values);
-                                if (term1_DocId_posList.hasNext()) {
-                                    p1 = term1_DocId_posList.next();
-                                } else {
-                                    if (term1_DocIds.hasNext()) {
-                                        term1_DocId = term1_DocIds.next();
-                                    } else {
-                                        quit = true;
-                                    }
-                                    break;
-                                }
-                            } else if (p1 < p2) {
-                                if (term1_DocId_posList.hasNext()) {
-                                    p1 = term1_DocId_posList.next();
-                                } else {
-                                    if (term1_DocIds.hasNext()) {
-                                        term1_DocId = term1_DocIds.next();
-                                    } else {
-                                        quit = true;
-                                    }
-                                    break;
-                                }
-                            } else if (p2 < p1) {
-                                if (term2_DocId_posList.hasNext()) {
-                                    p2 = term2_DocId_posList.next();
-                                } else {
-                                    if (term2_DocIds.hasNext()) {
-                                        term2_DocId = term2_DocIds.next();
-                                    } else {
-                                        quit = true;
-                                    }
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                } else if (term1_DocId < term2_DocId) {
-                    if (term1_DocIds.hasNext()) {
-                        term1_DocId = term1_DocIds.next();
-                    } else {
-                        break;
-                    }
-                } else if (term2_DocId < term1_DocId) {
-                    if (term2_DocIds.hasNext()) {
-                        term2_DocId = term2_DocIds.next();
-                    } else {
-                        break;
-                    }
-                }
-            }
-        }
-        return result;
-    }
-
-    /**
-     * searches for documents which contains token1 or token2
-     *
-     * @param token1
-     * @param token2
-     * @return List of documentIds
-     */
-    private static Set<String> processOR(String token) {
-        Set<String> documentIds = new HashSet<>();
-        Set<Integer> docIds = index.getPostings(token).keySet();
-        docIds.stream().forEach((Integer id) -> {
-            documentIds.add(fileNames.get(id));
-        });
-        return documentIds;
-    }
-
     // prints a bunch of spaces
     private static void printSpaces(int spaces) {
         for (int i = 0; i < spaces; i++) {
@@ -427,8 +193,12 @@ public class SearchEngine {
         }
     }
 
-    private static void printIndex(PositionalInvertedIndex index,
-            ArrayList<String> fileNames) {
+    /**
+     * print index details
+     *
+     * @param index positional index for the selected corpus
+     */
+    private static void printIndex(PositionalInvertedIndex index) {
 
         String[] dictionary = index.getDictionary();
 
@@ -459,5 +229,4 @@ public class SearchEngine {
             System.out.print("\b\n");
         }
     }
-
 }
