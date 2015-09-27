@@ -96,11 +96,13 @@ public class SearchEngine {
     private static void processQueries() {
         Scanner scan = new Scanner(System.in);
         String query;
+        QuerySyntaxCheck syntaxChecker  = new QuerySyntaxCheck();
         // set of all keys
         while (true) {
             System.out.print("Enter a query to search for: ");
             // remove extra space if any in query
             query = scan.nextLine().trim();
+            System.out.println(syntaxChecker.isValidQuery(query));
             if (query.equals("")) {
                 System.out.println("Please Enter a search query!");
                 continue;

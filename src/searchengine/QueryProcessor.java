@@ -55,7 +55,6 @@ public class QueryProcessor {
         } else {    // series of tokens with optional '-'
             return processQueryLiterals(query);
         }
-
         return result;
     }
 
