@@ -81,16 +81,13 @@ public class QuerySyntaxCheck {
             if (queryLiteralSeq.contains("-")) {
                 String[] splitLiteralSeq = queryLiteralSeq.split("\\s+");
                 for (String queryLiteral : splitLiteralSeq) {
-                    System.out.println("1--:" + queryLiteral);
                     // check if there is a positive literal
                     if (!queryLiteral.contains("-") && queryLiteral.trim().length() > 0) {
-                        System.out.println("2--:" + queryLiteral);
                         isPos = true;
                         break;
                     }
                 }
             } else if (queryLiteralSeq.trim().length() > 0) {
-                System.out.println("3--:" + queryLiteralSeq);
                 isPos = true;
             }
         }

@@ -102,7 +102,10 @@ public class SearchEngine {
             System.out.print("Enter a query to search for: ");
             // remove extra space if any in query
             query = scan.nextLine().trim();
-            System.out.println(syntaxChecker.isValidQuery(query));
+            // check if query syntax is not valid
+            if(!syntaxChecker.isValidQuery(query)){
+                break;
+            }
             if (query.equals("")) {
                 System.out.println("Please Enter a search query!");
                 continue;
