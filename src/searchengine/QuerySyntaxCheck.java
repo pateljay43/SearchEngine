@@ -47,7 +47,7 @@ public class QuerySyntaxCheck {
     // returns a success or error message that reports if query contains no empty sequence of literals
     public String checkNoEmptyQ(String query) {
         String message = "valid";
-        query = query.replaceAll("[^A-Za-z0-9-+)( \"]", "");
+        query = query.replaceAll("[^A-Za-z0-9-+ \"]", "");
         if (query.endsWith("+") || query.endsWith("-")) {
             message = "Query contains an empty sequence of literals";
             return message;
@@ -104,13 +104,13 @@ public class QuerySyntaxCheck {
         String message2 = checkNoEmptyQ(query);
         String message3 = checkOnePosLit(query);
         if (!message1.equals("valid")) {
-            System.out.println(message1);
+//            System.out.println(message1 + "\n");
             return false;
         } else if (!message2.equals("valid")) {
-            System.out.println(message2);
+//            System.out.println(message2 + "\n");
             return false;
         } else if (!message3.equals("valid")) {
-            System.out.println(message3);
+//            System.out.println(message3 + "\n");
             return false;
         }
         return true;

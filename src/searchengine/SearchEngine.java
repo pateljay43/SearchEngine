@@ -8,6 +8,7 @@ package searchengine;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -45,6 +46,8 @@ public class SearchEngine {
         // the list of file names that were processed
         fileNames = new ArrayList<>();
 
+        long sTime = System.nanoTime();
+        System.out.println("Indexing Files.....\n");
         // This is our standard "walk through all .txt files" code.
         Files.walkFileTree(currentWorkingPath, new SimpleFileVisitor<Path>() {
 
@@ -65,7 +68,7 @@ public class SearchEngine {
                 if (file.toString().endsWith(".txt")) {
                     // we have found a .txt file; add its name to the fileName list,
                     // then index the file and increase the document ID counter.
-                    System.out.println("Indexing file " + file.getFileName());
+//                    System.out.println("Indexing file " + file.getFileName());
                     longestFile = Math.max(longestFile, file.getFileName().toString().length());
                     fileNames.add(file.getFileName().toString());
                     indexFile(file.toFile(), index, mDocumentID);
@@ -82,11 +85,15 @@ public class SearchEngine {
             }
 
         });
+        System.out.println("Indexing Completed!");
 
-//        printIndex(index);
         index.indexFinalize();
         printStatistics();
-        processQueries();
+        System.out.println("Elapsed Time:");
+        System.out.println("\t" + BigDecimal.valueOf(((double) System.nanoTime() - sTime) / 1000000000)
+                + " seconds");
+        GUI gui = new GUI(new QueryProcessor(index), fileNames);
+//        processQueries();
     }
 
     /**
@@ -96,35 +103,32 @@ public class SearchEngine {
     private static void processQueries() {
         Scanner scan = new Scanner(System.in);
         String query;
-        QuerySyntaxCheck syntaxChecker  = new QuerySyntaxCheck();
+        QuerySyntaxCheck syntaxChecker = new QuerySyntaxCheck();
         // set of all keys
         while (true) {
             System.out.print("Enter a query to search for: ");
             // remove extra space if any in query
             query = scan.nextLine().trim();
             // check if query syntax is not valid
-            if(!syntaxChecker.isValidQuery(query)){
-                break;
+            if (query.length() > 0 && syntaxChecker.isValidQuery(query)) {
+                if (query.equals("EXIT")) {
+                    System.out.println("Bye!");
+                    break;
+                }
+                QueryProcessor queryProcessor = new QueryProcessor(index);
+                Set<Integer> resultDocIDs = queryProcessor.processQuery(query);
+                if (resultDocIDs.isEmpty()) {
+                    System.out.println("No documents satisfies that query..!\n");
+                    continue;
+                }
+                System.out.println("These documents satisfies that query:");
+                resultDocIDs.stream().forEach((Integer docId) -> {
+                    System.out.print(fileNames.get(docId) + " ");
+                });
+                System.out.print("\b\n\n");
+            } else {
+//                System.out.print("Invalid Query!\n\n");
             }
-            if (query.equals("")) {
-                System.out.println("Please Enter a search query!");
-                continue;
-            }
-            if (query.equals("EXIT")) {
-                System.out.println("Bye!");
-                break;
-            }
-            QueryProcessor queryProcessor = new QueryProcessor(index);
-            Set<Integer> resultDocIDs = queryProcessor.processQuery(query);
-            if (resultDocIDs.isEmpty()) {
-                System.out.println("No documents satisfies that query..!\n");
-                continue;
-            }
-            System.out.println("These documents satisfies that query:");
-            resultDocIDs.stream().forEach((Integer docId) -> {
-                System.out.print(fileNames.get(docId) + " ");
-            });
-            System.out.print("\b\n\n");
         }
     }
 

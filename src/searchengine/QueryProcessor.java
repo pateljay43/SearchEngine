@@ -69,38 +69,49 @@ public class QueryProcessor {
         int target = 0;
         HashMap<Integer, Integer> andSplit = new HashMap<>();
         for (Iterator<String> it = split.iterator(); it.hasNext();) {
-            String token = it.next();
-            if (token.contains("\"")) {
+            String token = it.next().replaceAll("[)(]", "").trim();
+            if (token.startsWith("\"")) {
                 containPositive = true;
                 target++;
-                ArrayList<String> newquery = new ArrayList<>();
-                newquery.add(porterstemmer.
-                        processToken(token.trim().substring(1, token.length())));
-                while (it.hasNext()) {
-                    String next = it.next().trim();
-                    if (next.contains("\"")) {
-                        newquery.add(porterstemmer.
-                                processToken(next.substring(0, next.length() - 1)));
-                        break;
+                String substring = token.trim().substring(1, token.length());
+                Set<Integer> processPhrase;
+                if (substring.endsWith("\"")) {
+                    processPhrase = processQuery(substring
+                            .substring(0, substring.length() - 1));
+                } else {
+                    ArrayList<String> newquery = new ArrayList<>();
+                    newquery.add(porterstemmer.
+                            processToken(substring));
+                    while (it.hasNext()) {
+                        String next = it.next().replaceAll("[)(]", "").trim();
+                        if (next.endsWith("\"")) {
+                            newquery.add(porterstemmer.
+                                    processToken(next.substring(0, next.length() - 1)));
+                            break;
+                        }
+                        newquery.add(porterstemmer.processToken(next));
                     }
-                    newquery.add(porterstemmer.processToken(next));
+                    processPhrase = processPhrase(newquery);
                 }
-                Set<Integer> processPhrase = processPhrase(newquery);
                 processPhrase.stream().forEach((Integer docId) -> {
                     Integer value = andSplit.getOrDefault(docId, 0);
                     andSplit.put(docId, value + 1);
                 });
-            } else if (token.contains("(")) {
+            } else if (token.startsWith("(")) {
                 containPositive = true;
                 target++;
                 String newquery = token.substring(1, token.length());
-                while (it.hasNext()) {
-                    String next = it.next();
-                    if (next.contains(")")) {
-                        newquery = newquery + " " + next.substring(0, next.length() - 1);
-                        break;
+                if (newquery.endsWith(")")) {
+                    newquery = newquery.substring(0, newquery.length() - 1);
+                } else {
+                    while (it.hasNext()) {
+                        String next = it.next().trim();
+                        if (next.endsWith(")")) {
+                            newquery = newquery + " " + next.substring(0, next.length() - 1);
+                            break;
+                        }
+                        newquery = newquery + " " + next;
                     }
-                    newquery = newquery + " " + next;
                 }
                 Set<Integer> processQuery = processQuery(newquery);
                 processQuery.stream().forEach((Integer docId) -> {
@@ -118,7 +129,7 @@ public class QueryProcessor {
                         Integer value = andSplit.getOrDefault(docId, 0);
                         andSplit.put(docId, value - 1);
                     }
-                } else {
+                } else {        // single positive token
                     containPositive = true;
                     target++;
                     Iterator<Integer> keySet = index.getPostings(porterstemmer.
