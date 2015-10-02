@@ -20,6 +20,7 @@ import java.util.HashSet;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeMap;
+import javax.swing.JFileChooser;
 
 /**
  *
@@ -37,8 +38,22 @@ public class SearchEngine {
     private static Path currentWorkingPath;
 
     public static void main(String[] args) throws IOException {
-
-        currentWorkingPath = Paths.get(folderName).toAbsolutePath();
+        JFileChooser chooser = new JFileChooser();
+        chooser.setCurrentDirectory(new java.io.File(""));
+        chooser.setDialogTitle("Select any directory with text files");
+        chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        chooser.setAcceptAllFileFilterUsed(false);
+        chooser.setVisible(true);
+        // selected directory
+        File selectedDirectory = null;
+        if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+            selectedDirectory = chooser.getSelectedFile();
+//            System.out.println("getSelectedFile() : " + chooser.getSelectedFile());
+        } else {
+            System.out.println("No Selection ");
+            System.exit(0);
+        }
+        currentWorkingPath = Paths.get(selectedDirectory.getPath()).toAbsolutePath();
         // the inverted index
         porterstemmer = new PorterStemmer();
         index = new PositionalInvertedIndex();
@@ -87,49 +102,14 @@ public class SearchEngine {
         });
         System.out.println("Indexing Completed!");
 
-        index.indexFinalize();
-        printStatistics();
+        // 10 most frequent terms
+        index.indexFinalize(10);
         System.out.println("Elapsed Time:");
         System.out.println("\t" + BigDecimal.valueOf(((double) System.nanoTime() - sTime) / 1000000000)
                 + " seconds");
-        GUI gui = new GUI(new QueryProcessor(index), fileNames);
-//        processQueries();
-    }
 
-    /**
-     * starts waiting for queries from user and gives response accordingly until
-     * user types 'EXIT'
-     */
-    private static void processQueries() {
-        Scanner scan = new Scanner(System.in);
-        String query;
-        QuerySyntaxCheck syntaxChecker = new QuerySyntaxCheck();
-        // set of all keys
-        while (true) {
-            System.out.print("Enter a query to search for: ");
-            // remove extra space if any in query
-            query = scan.nextLine().trim();
-            // check if query syntax is not valid
-            if (query.length() > 0 && syntaxChecker.isValidQuery(query)) {
-                if (query.equals("EXIT")) {
-                    System.out.println("Bye!");
-                    break;
-                }
-                QueryProcessor queryProcessor = new QueryProcessor(index);
-                Set<Integer> resultDocIDs = queryProcessor.processQuery(query);
-                if (resultDocIDs.isEmpty()) {
-                    System.out.println("No documents satisfies that query..!\n");
-                    continue;
-                }
-                System.out.println("These documents satisfies that query:");
-                resultDocIDs.stream().forEach((Integer docId) -> {
-                    System.out.print(fileNames.get(docId) + " ");
-                });
-                System.out.print("\b\n\n");
-            } else {
-//                System.out.print("Invalid Query!\n\n");
-            }
-        }
+        // start GUI for searching
+        GUI gui = new GUI(index, fileNames);
     }
 
     /**
@@ -175,67 +155,15 @@ public class SearchEngine {
         }
     }
 
-    /**
-     * # of Terms, # of Types, Average number of documents per term, 10 most
-     * frequent terms, Approximate total memory required by index
-     */
-    private static void printStatistics() {
-        System.out.println("Number of Terms: " + index.getTermCount());
-        System.out.println("Number of Types (distinct tokens): " + types.size());
-        System.out.println("Average number of documents per term: "
-                + ((double) index.getTotalDocumentCount()) / index.getTermCount());
-        System.out.println("10 most frequent words statistics...");
-        ArrayList<String> mostFrequentTerms = index.mostFrequentTerms(10);
-        System.out.println("\t" + mostFrequentTerms);
-        System.out.print("\t[");
-        for (String key : mostFrequentTerms) {
-            System.out.printf("%.2f, ", (double) index.getPostings(key).size() / mDocumentID);
-        }
-        System.out.println("\b\b]");
-        System.out.println("Approximate total memory requirement: " + index.getTotalMemory() + "bytes");
+    public static Set<String> getTypes() {
+        return types;
     }
 
-    // prints a bunch of spaces
-    private static void printSpaces(int spaces) {
-        for (int i = 0; i < spaces; i++) {
-            System.out.print(" ");
-        }
+    public static int getmDocumentID() {
+        return mDocumentID;
     }
 
-    /**
-     * print index details
-     *
-     * @param index positional index for the selected corpus
-     */
-    private static void printIndex(PositionalInvertedIndex index) {
-
-        String[] dictionary = index.getDictionary();
-
-        // find the longest word length in the index
-        int longestWord = index.getLongestWordLength();
-
-        for (String term : dictionary) {
-            System.out.print(term + ": ");
-            printSpaces(longestWord - term.length());
-            TreeMap<Integer, ArrayList<Long>> postings = index.getPostings(term);
-            postings.keySet().stream().map((docId) -> {
-                String file = fileNames.get(docId);
-                System.out.print("{" + file);
-                printSpaces(longestFile - file.length());
-                System.out.print(" ");
-                return docId;
-            }).map((docId) -> postings.get(docId)).map((positions) -> {
-                System.out.print(":<");
-                return positions;
-            }).map((positions) -> {
-                positions.stream().forEach((position) -> {
-                    System.out.print(position + ",");
-                });
-                return positions;
-            }).forEach((_item) -> {
-                System.out.print("\b>} ");
-            });
-            System.out.print("\b\n");
-        }
+    public static Path getCurrentWorkingPath() {
+        return currentWorkingPath;
     }
 }

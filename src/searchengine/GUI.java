@@ -7,19 +7,28 @@ package searchengine;
 
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Event;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.Vector;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.swing.AbstractAction;
 import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JFileChooser;
@@ -30,6 +39,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
+import javax.swing.KeyStroke;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableCellRenderer;
@@ -39,8 +49,10 @@ import javax.swing.table.TableColumnModel;
  *
  * @author JAY
  */
-public class GUI extends JFrame {
+public class GUI extends JFrame implements MouseListener {
 
+    private final DecimalFormat df2;
+    private final PositionalInvertedIndex index;
     private final QueryProcessor queryProcessor;
     private final QuerySyntaxCheck syntaxChecker;
     private final ArrayList<String> fileNames;
@@ -58,17 +70,26 @@ public class GUI extends JFrame {
     private final JLabel processingTime;
     private final JLabel indexStatisticsLBL;
 
-    public GUI(QueryProcessor _queryProcessor, ArrayList<String> _fileNames) {
-        queryProcessor = _queryProcessor;
+    public GUI(PositionalInvertedIndex _index, ArrayList<String> _fileNames) {
+        index = _index;
+        queryProcessor = new QueryProcessor(_index);
         fileNames = _fileNames;
         syntaxChecker = new QuerySyntaxCheck();
         queryResult = new ArrayList<>();
         queryHistory = new HashMap<>();
 //        queryHistoryPointer = queryHistory.size();
+        df2 = new DecimalFormat("#.##");
 
         queryTF = new JTextField();
         queryTF.setBounds(10, 5, 700, 40);
         queryTF.addKeyListener(new KeyListenerImpl());
+        queryTF.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_I, Event.CTRL_MASK), "myCode");
+        queryTF.getActionMap().put("myCode", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                showStatistics();
+            }
+        });
         add(queryTF);
 
         searchBtn = new JButton("Search");
@@ -84,6 +105,7 @@ public class GUI extends JFrame {
         Jtable = new JTable(tableModel);
         Jtable.setGridColor(Color.gray);
         Jtable.setShowVerticalLines(false);
+        Jtable.addMouseListener(this);
         tableScrollPane = new JScrollPane(Jtable,
                 JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
                 JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
@@ -122,7 +144,16 @@ public class GUI extends JFrame {
         }
         boolean ret = false;
         // check if query syntax is not valid
-        if (query.length() > 0 && syntaxChecker.isValidQuery(query)) {
+        if (!syntaxChecker.isValidQuery(query)) {       // invalid query
+            hideResultPanel();
+            if (showErrors) {
+                JOptionPane.showMessageDialog(this,
+                        syntaxChecker.getErrorMessage(),
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE);
+                return false;
+            }
+        } else {        // valid query
             if (showErrors && query.equals("EXIT")) {
                 // 0 -> yes, 1 -> no, -1 -> dialog closed
                 int n = JOptionPane.showOptionDialog(this,
@@ -298,4 +329,58 @@ public class GUI extends JFrame {
             }
         }
     }
+
+    /**
+     * # of Terms, # of Types, Average number of documents per term, 10 most
+     * frequent terms, Approximate total memory required by index
+     */
+    private void showStatistics() {
+        JOptionPane.showMessageDialog(this,
+                "Number of Terms: " + index.getTermCount() + "\n"
+                + "Number of Types (distinct tokens): " + SearchEngine.getTypes().size() + "\n"
+                + "Average number of documents per term: " + df2.format(index.getAvgDocPerTerm()) + "\n"
+                + "Approximate total memory requirement: "
+                + df2.format(index.getTotalMemory() / Math.pow(2.00, 20))
+                + " Megabytes\n"
+                + "10 most frequent words statistics: (term,document frequency) \n"
+                + index.getMostFreqTerms(),
+                "Index Statistics", JOptionPane.INFORMATION_MESSAGE
+        );
+    }
+
+    @Override
+    public void mouseClicked(MouseEvent e) {
+        if (e.getClickCount() == 2) {
+            JTable target = (JTable) e.getSource();
+            int row = target.getSelectedRow();
+            String filename = (String) target.getValueAt(row, 0);
+            String[] executable = {"open", "-t",
+                SearchEngine.getCurrentWorkingPath() + "/" + filename};
+            try {
+                Process exec = Runtime.getRuntime().exec(executable);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+            System.out.println("" + SearchEngine.getCurrentWorkingPath());
+            System.out.println("" + filename);
+            System.out.println(executable);
+        }
+    }
+
+    @Override
+    public void mousePressed(MouseEvent e) {
+    }
+
+    @Override
+    public void mouseReleased(MouseEvent e) {
+    }
+
+    @Override
+    public void mouseEntered(MouseEvent e) {
+    }
+
+    @Override
+    public void mouseExited(MouseEvent e) {
+    }
+
 }

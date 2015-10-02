@@ -5,6 +5,7 @@
  */
 package searchengine;
 
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Set;
@@ -20,6 +21,10 @@ public class PositionalInvertedIndex {
     // <term,<docID,<p1,p2,...,pn>>>
     private final HashMap<String, TreeMap<Integer, ArrayList<Long>>> mIndex;
     //private final HashMap<String, List<PositionalPosting>>
+    private String mostFreqTerms;
+    private double avgDocPerTerm;
+    private final DecimalFormat df2;
+
     private int longestWord;
 
     // Variables for statistics
@@ -33,6 +38,7 @@ public class PositionalInvertedIndex {
     public PositionalInvertedIndex() {
         mIndex = new HashMap<>();
         longestWord = 0;
+        df2 = new DecimalFormat("#.##");
     }
 
     /**
@@ -116,8 +122,13 @@ public class PositionalInvertedIndex {
         return totalDocumentCount;
     }
 
-    // statistics 
-    public void indexFinalize() {
+    /**
+     * calculate statistics of index and find 'mostFreqLimit' terms in that
+     * index
+     *
+     * @param mostFreqLimit
+     */
+    public void indexFinalize(int mostFreqLimit) {
         long totalStrMem = 0;
         long totalPostListMem = 0;
         long totalPostMem = 0;
@@ -150,17 +161,19 @@ public class PositionalInvertedIndex {
             }
         }
         totalMemory = hashMem + totalStrMem + totalPostListMem + totalPostMem;
+        avgDocPerTerm = ((double) totalDocumentCount) / mIndex.size();
+        mostFrequentTerms(mostFreqLimit);
     }
 
     /**
      * find k most frequent terms from the index
      *
      * @param k must be greater than 1
-     * @return list of 10 most frequent terms (first term will be most frequent,
-     * last will be least frequent)
+     * @return 
      */
-    public ArrayList<String> mostFrequentTerms(int k) {
-        ArrayList<String> mostfreq = new ArrayList<String>(k);
+    public void mostFrequentTerms(int k) {
+        mostFreqTerms = "";
+        ArrayList<String> temp = new ArrayList<>();
         for (int i = 0; i < k; i++) {
             int maxSize = 0;
             String maxSize_Key = null;
@@ -168,15 +181,26 @@ public class PositionalInvertedIndex {
             while (keys.hasNext()) {
                 String key = keys.next();
                 int numOfDocs = mIndex.get(key).size();
-                if (numOfDocs > maxSize && !mostfreq.contains(key)) {
+                if (numOfDocs > maxSize && !temp.contains(key)) {
                     maxSize = numOfDocs;
                     maxSize_Key = key;
                 }
             }
             if (maxSize_Key != null) {
-                mostfreq.add(i, maxSize_Key);
+                temp.add(i, maxSize_Key);
             }
         }
-        return mostfreq;
+        temp.stream().forEach((key) -> {
+            mostFreqTerms = mostFreqTerms + "\t<" + key + ", "
+                    + df2.format((double) mIndex.get(key).size() / SearchEngine.getmDocumentID()) + ">\n";
+        });
+    }
+
+    public String getMostFreqTerms() {
+        return mostFreqTerms;
+    }
+
+    public double getAvgDocPerTerm() {
+        return avgDocPerTerm;
     }
 }
