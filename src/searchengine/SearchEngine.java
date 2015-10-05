@@ -5,6 +5,7 @@
  */
 package searchengine;
 
+import java.awt.Desktop;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -17,9 +18,7 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Scanner;
 import java.util.Set;
-import java.util.TreeMap;
 import javax.swing.JFileChooser;
 
 /**
@@ -31,10 +30,10 @@ public class SearchEngine {
     private static PorterStemmer porterstemmer;
     private static int longestFile = 0;
     private static int mDocumentID = 0;
-    private static Set<String> types = new HashSet<>();
+    private static final Set<String> types = new HashSet<>();
     private static PositionalInvertedIndex index;
     private static ArrayList<String> fileNames;
-    private static final String folderName = "Search Space";
+//    private static final String folderName = "Search Space";
     private static Path currentWorkingPath;
 
     public static void main(String[] args) throws IOException {
@@ -45,6 +44,7 @@ public class SearchEngine {
         chooser.setAcceptAllFileFilterUsed(false);
         chooser.setVisible(true);
         // selected directory
+        System.out.println("started");
         File selectedDirectory = null;
         if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
             selectedDirectory = chooser.getSelectedFile();

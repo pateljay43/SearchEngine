@@ -6,7 +6,7 @@
 package searchengine;
 
 import java.awt.Color;
-import java.awt.Component;
+import java.awt.Desktop;
 import java.awt.Event;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -14,36 +14,27 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
+import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.AbstractAction;
 import javax.swing.JButton;
-import javax.swing.JDialog;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
-import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.KeyStroke;
-import javax.swing.event.ListSelectionEvent;
 import javax.swing.table.AbstractTableModel;
-import javax.swing.table.TableCellRenderer;
-import javax.swing.table.TableColumnModel;
 
 /**
  *
@@ -79,7 +70,7 @@ public class GUI extends JFrame implements MouseListener {
         queryHistory = new HashMap<>();
 //        queryHistoryPointer = queryHistory.size();
         df2 = new DecimalFormat("#.##");
-
+        
         queryTF = new JTextField();
         queryTF.setBounds(10, 5, 700, 40);
         queryTF.addKeyListener(new KeyListenerImpl());
@@ -91,10 +82,17 @@ public class GUI extends JFrame implements MouseListener {
             }
         });
         add(queryTF);
-
+        
         searchBtn = new JButton("Search");
         searchBtn.setBounds(710, 10, 80, 30);
         searchBtn.addActionListener(new ActionListenerImpl());
+        searchBtn.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_I, Event.CTRL_MASK), "myCode");
+        searchBtn.getActionMap().put("myCode", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                showStatistics();
+            }
+        });
         add(searchBtn);
 
         indexStatisticsLBL = new JLabel("Index Statistics:-  Press (Ctrl + i)");
@@ -106,6 +104,13 @@ public class GUI extends JFrame implements MouseListener {
         Jtable.setGridColor(Color.gray);
         Jtable.setShowVerticalLines(false);
         Jtable.addMouseListener(this);
+        Jtable.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_I, Event.CTRL_MASK), "myCode");
+        Jtable.getActionMap().put("myCode", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                showStatistics();
+            }
+        });
         tableScrollPane = new JScrollPane(Jtable,
                 JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
                 JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
@@ -315,7 +320,7 @@ public class GUI extends JFrame implements MouseListener {
             }
         }
     }
-
+    
     private class ActionListenerImpl implements ActionListener {
 
         public ActionListenerImpl() {
@@ -354,16 +359,28 @@ public class GUI extends JFrame implements MouseListener {
             JTable target = (JTable) e.getSource();
             int row = target.getSelectedRow();
             String filename = (String) target.getValueAt(row, 0);
-            String[] executable = {"open", "-t",
-                SearchEngine.getCurrentWorkingPath() + "/" + filename};
-            try {
-                Process exec = Runtime.getRuntime().exec(executable);
-            } catch (Exception ex) {
-                ex.printStackTrace();
+            String fileURI = "";
+            Desktop desktop = Desktop.getDesktop();
+            if(System.getProperty("os.name").toLowerCase().contains("windows")){
+                fileURI = SearchEngine.getCurrentWorkingPath() + "\\" + filename;
+                
+            }else{
+                fileURI = SearchEngine.getCurrentWorkingPath() + "/" + filename;
             }
+            try {
+                desktop.open(new File(fileURI));
+            } catch (IOException ex) {
+                Logger.getLogger(GUI.class.getName()).log(Level.SEVERE, null, ex);
+            }
+//            String[] executable = {"open", "-t",fileURI};
+//            try {
+//                Process exec = Runtime.getRuntime().exec(executable);
+//            } catch (Exception ex) {
+//                ex.printStackTrace();
+//            }
             System.out.println("" + SearchEngine.getCurrentWorkingPath());
             System.out.println("" + filename);
-            System.out.println(executable);
+//            System.out.println(executable);
         }
     }
 
