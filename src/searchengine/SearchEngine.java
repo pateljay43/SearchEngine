@@ -5,7 +5,7 @@
  */
 package searchengine;
 
-import java.awt.Desktop;
+import java.awt.Cursor;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -18,8 +18,26 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javafx.application.Application;
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
+import javafx.stage.DirectoryChooser;
+import javafx.stage.Stage;
 import javax.swing.JFileChooser;
+import javax.swing.JFrame;
+import javax.swing.JProgressBar;
+import javax.swing.UIManager;
+import javax.swing.WindowConstants;
+import org.apache.commons.io.FileUtils;
 
 /**
  *
@@ -27,89 +45,156 @@ import javax.swing.JFileChooser;
  */
 public class SearchEngine {
 
-    private static PorterStemmer porterstemmer;
-    private static int longestFile = 0;
-    private static int mDocumentID = 0;
-    private static final Set<String> types = new HashSet<>();
-    private static PositionalInvertedIndex index;
-    private static ArrayList<String> fileNames;
+    private PorterStemmer porterstemmer;
+    private int longestFile;
+    static int mDocumentID;
+    private Set<String> types;
+    private PositionalInvertedIndex index;
+    private ArrayList<String> fileNames;
 //    private static final String folderName = "Search Space";
-    private static Path currentWorkingPath;
+    private Path currentWorkingPath;
+    private JFileChooser directoryPicker;
+    private GUI UI;
+    private JProgressBar pb;
+
+    public SearchEngine() {
+        initVariables();
+        selectSearchSpace();
+        createIndex();
+        createUI();
+    }
 
     public static void main(String[] args) throws IOException {
-        JFileChooser chooser = new JFileChooser();
-        chooser.setCurrentDirectory(new java.io.File(""));
-        chooser.setDialogTitle("Select any directory with text files");
-        chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        chooser.setAcceptAllFileFilterUsed(false);
-        chooser.setVisible(true);
+        SearchEngine searchEngine;
+        while (true) {
+            searchEngine = new SearchEngine();
+            while (!searchEngine.UI.isChangeIndex()) {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(SearchEngine.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+            if (searchEngine.UI.isQuit()) {
+                System.exit(0);
+            }
+            searchEngine.UI.dispose();
+            try {
+                searchEngine.finalize();
+            } catch (Throwable ex) {
+                Logger.getLogger(SearchEngine.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+    }
+
+    private void initVariables() {
+        longestFile = 0;
+        mDocumentID = 0;
+        types = new HashSet<>();
+        directoryPicker = new JFileChooser();
+        porterstemmer = new PorterStemmer();
+        index = new PositionalInvertedIndex(this);
+        fileNames = new ArrayList<>();
+    }
+
+    private void selectSearchSpace() {
+//        try {
+//            UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
+//        } catch (Exception e) {
+//            System.out.println("Error setting Java LAF: " + e);
+//        }
+        JFrame frame = new JFrame("Scanning Directory");
+        frame.add(directoryPicker);
+        frame.setSize(0, 0);
+        frame.setLayout(null);
+        frame.setResizable(false);
+        frame.setLocationRelativeTo(null);
+        frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+        frame.setVisible(true);
+        frame.setVisible(false);
+        directoryPicker.setCurrentDirectory(new java.io.File(""));
+        directoryPicker.setDialogTitle("Select any directory with text files");
+        directoryPicker.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        directoryPicker.setAcceptAllFileFilterUsed(false);
+        directoryPicker.setVisible(true);
         // selected directory
-        System.out.println("started");
         File selectedDirectory = null;
-        if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-            selectedDirectory = chooser.getSelectedFile();
-//            System.out.println("getSelectedFile() : " + chooser.getSelectedFile());
+//        File selectedDirectory = directoryChooser.showDialog(null);
+        if (directoryPicker.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+            selectedDirectory = directoryPicker.getSelectedFile();
         } else {
-            System.out.println("No Selection ");
             System.exit(0);
         }
+        frame.dispose();
         currentWorkingPath = Paths.get(selectedDirectory.getPath()).toAbsolutePath();
-        // the inverted index
-        porterstemmer = new PorterStemmer();
-        index = new PositionalInvertedIndex();
+    }
 
-        // the list of file names that were processed
-        fileNames = new ArrayList<>();
-
+    private void createIndex() {
+        File dir = new File(currentWorkingPath.toString());
+        String[] extensions = new String[]{"txt"};
+        List<File> files = (List<File>) FileUtils.listFiles(dir, extensions, true);
         long sTime = System.nanoTime();
-        System.out.println("Indexing Files.....\n");
-        // This is our standard "walk through all .txt files" code.
-        Files.walkFileTree(currentWorkingPath, new SimpleFileVisitor<Path>() {
+        pb = new JProgressBar(0, files.size());
+        pb.setStringPainted(true);
+        pb.setBorderPainted(true);
+        pb.setBounds(10, 10, 370, 25);
+        pb.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+        JFrame frame = new JFrame("Scanning Directory");
+        frame.add(pb);
+        int offset = System.getProperty("os.name").toLowerCase().contains("windows") ? 30 : 20;
+        frame.setSize(400, 45 + offset);
+        frame.setLayout(null);
+        frame.setResizable(false);
+        frame.setVisible(true);
+        frame.setLocationRelativeTo(null);
+        frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+        try {
+            // This is our standard "walk through all .txt files" code.
+            Files.walkFileTree(currentWorkingPath, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir,
+                        BasicFileAttributes attrs) {
+                    // make sure we only process the current working directory
+                    if (currentWorkingPath.equals(dir)) {
+                        return FileVisitResult.CONTINUE;
+                    }
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
 
-            @Override
-            public FileVisitResult preVisitDirectory(Path dir,
-                    BasicFileAttributes attrs) {
-                // make sure we only process the current working directory
-                if (currentWorkingPath.equals(dir)) {
+                @Override
+                public FileVisitResult visitFile(Path file,
+                        BasicFileAttributes attrs) {
+                    // only process .txt files
+                    if (file.toString().endsWith(".txt")) {
+                        // we have found a .txt file; add its name to the fileName list,
+                        // then index the file and increase the document ID counter.
+                        longestFile = Math.max(longestFile, file.getFileName().toString().length());
+                        fileNames.add(file.getFileName().toString());
+                        indexFile(file.toFile(), index, mDocumentID);
+                        mDocumentID++;
+                        pb.setValue(mDocumentID);
+                    }
                     return FileVisitResult.CONTINUE;
                 }
-                return FileVisitResult.SKIP_SUBTREE;
-            }
 
-            @Override
-            public FileVisitResult visitFile(Path file,
-                    BasicFileAttributes attrs) {
-                // only process .txt files
-                if (file.toString().endsWith(".txt")) {
-                    // we have found a .txt file; add its name to the fileName list,
-                    // then index the file and increase the document ID counter.
-//                    System.out.println("Indexing file " + file.getFileName());
-                    longestFile = Math.max(longestFile, file.getFileName().toString().length());
-                    fileNames.add(file.getFileName().toString());
-                    indexFile(file.toFile(), index, mDocumentID);
-                    mDocumentID++;
+                // don't throw exceptions if files are locked/other errors occur
+                @Override
+                public FileVisitResult visitFileFailed(Path file,
+                        IOException e) {
+                    return FileVisitResult.CONTINUE;
                 }
-                return FileVisitResult.CONTINUE;
-            }
 
-            // don't throw exceptions if files are locked/other errors occur
-            @Override
-            public FileVisitResult visitFileFailed(Path file,
-                    IOException e) {
-                return FileVisitResult.CONTINUE;
-            }
-
-        });
-        System.out.println("Indexing Completed!");
+            });
+        } catch (IOException ex) {
+            Logger.getLogger(SearchEngine.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        frame.dispose();
 
         // 10 most frequent terms
         index.indexFinalize(10);
         System.out.println("Elapsed Time:");
         System.out.println("\t" + BigDecimal.valueOf(((double) System.nanoTime() - sTime) / 1000000000)
                 + " seconds");
-
-        // start GUI for searching
-        GUI gui = new GUI(index, fileNames);
     }
 
     /**
@@ -123,7 +208,7 @@ public class SearchEngine {
      * @param docID the integer ID of the current document, needed when indexing
      * each term from the document.
      */
-    private static void indexFile(File file, PositionalInvertedIndex index,
+    private void indexFile(File file, PositionalInvertedIndex index,
             int docID) {
         SimpleTokenStream simpleTokenStream = null;
         try {
@@ -155,15 +240,8 @@ public class SearchEngine {
         }
     }
 
-    public static Set<String> getTypes() {
-        return types;
+    private void createUI() {
+        UI = new GUI(this.index, this.fileNames, this.currentWorkingPath, this.types.size());
     }
 
-    public static int getmDocumentID() {
-        return mDocumentID;
-    }
-
-    public static Path getCurrentWorkingPath() {
-        return currentWorkingPath;
-    }
 }

@@ -30,12 +30,14 @@ public class PositionalInvertedIndex {
     // Variables for statistics
     private long totalDocumentCount;
     private long totalMemory;
+//    private final SearchEngine searchEngine;
 
     /**
      * creates new mIndex which stores terms with document in which it occurs
      * and positions where it occurs in that document
      */
-    public PositionalInvertedIndex() {
+    public PositionalInvertedIndex(SearchEngine _searchEngine) {
+//        searchEngine = _searchEngine;
         mIndex = new HashMap<>();
         longestWord = 0;
         df2 = new DecimalFormat("#.##");
@@ -169,7 +171,7 @@ public class PositionalInvertedIndex {
      * find k most frequent terms from the index
      *
      * @param k must be greater than 1
-     * @return 
+     * @return
      */
     public void mostFrequentTerms(int k) {
         mostFreqTerms = "";
@@ -192,7 +194,7 @@ public class PositionalInvertedIndex {
         }
         temp.stream().forEach((key) -> {
             mostFreqTerms = mostFreqTerms + "\t<" + key + ", "
-                    + df2.format((double) mIndex.get(key).size() / SearchEngine.getmDocumentID()) + ">\n";
+                    + df2.format((double) mIndex.get(key).size() / SearchEngine.mDocumentID) + ">\n";
         });
     }
 
