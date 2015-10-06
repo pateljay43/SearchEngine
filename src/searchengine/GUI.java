@@ -94,11 +94,14 @@ public class GUI extends JFrame implements MouseListener {
 
         newDirectoryBtn = new JButton("Change Folder");
         newDirectoryBtn.setBounds(670, 7, 120, 25);
-        newDirectoryBtn.addActionListener(new ActionListener() {
-
+        newDirectoryBtn.addActionListener((ActionEvent e) -> {
+            setChangeIndex();
+        });
+        newDirectoryBtn.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_I, Event.CTRL_MASK), "ctrl+i");
+        newDirectoryBtn.getActionMap().put("ctrl+i", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                setChangeIndex();
+                showStatistics();
             }
         });
         add(newDirectoryBtn);
