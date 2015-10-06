@@ -22,20 +22,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javafx.application.Application;
-import javafx.event.ActionEvent;
-import javafx.event.EventHandler;
-import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
-import javafx.stage.DirectoryChooser;
-import javafx.stage.Stage;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JProgressBar;
-import javax.swing.UIManager;
 import javax.swing.WindowConstants;
 import org.apache.commons.io.FileUtils;
 
@@ -56,6 +45,7 @@ public class SearchEngine {
     private JFileChooser directoryPicker;
     private GUI UI;
     private JProgressBar pb;
+    private JFrame frame;
 
     public SearchEngine() {
         initVariables();
@@ -98,12 +88,7 @@ public class SearchEngine {
     }
 
     private void selectSearchSpace() {
-//        try {
-//            UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
-//        } catch (Exception e) {
-//            System.out.println("Error setting Java LAF: " + e);
-//        }
-        JFrame frame = new JFrame("Scanning Directory");
+        frame = new JFrame("Scanning Directory");
         frame.add(directoryPicker);
         frame.setSize(0, 0);
         frame.setLayout(null);
@@ -119,7 +104,6 @@ public class SearchEngine {
         directoryPicker.setVisible(true);
         // selected directory
         File selectedDirectory = null;
-//        File selectedDirectory = directoryChooser.showDialog(null);
         if (directoryPicker.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
             selectedDirectory = directoryPicker.getSelectedFile();
         } else {
@@ -139,9 +123,9 @@ public class SearchEngine {
         pb.setBorderPainted(true);
         pb.setBounds(10, 10, 370, 25);
         pb.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-        JFrame frame = new JFrame("Scanning Directory");
-        frame.add(pb);
         int offset = System.getProperty("os.name").toLowerCase().contains("windows") ? 30 : 20;
+        frame = new JFrame("Scanning Directory");
+        frame.add(pb);
         frame.setSize(400, 45 + offset);
         frame.setLayout(null);
         frame.setResizable(false);
