@@ -70,8 +70,6 @@ public class PositionalInvertedIndex {
      * positions (<document,[position1,..]>)
      */
     public TreeMap<Integer, ArrayList<Long>> getPostings(String term) {
-        ArrayList<String> arrayList = new ArrayList<>(mIndex.keySet());
-        System.out.println("" + arrayList.indexOf(term));
         return mIndex.getOrDefault(term, new TreeMap<>());
     }
 
