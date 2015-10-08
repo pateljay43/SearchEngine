@@ -23,12 +23,10 @@ public class QueryProcessor {
 
     private static PositionalInvertedIndex index;
     private static PorterStemmer porterstemmer;
-    private static boolean containPositive;
 
     public QueryProcessor(PositionalInvertedIndex _index) {
         index = _index;
         porterstemmer = new PorterStemmer();
-        containPositive = false;
     }
 
     /**
@@ -71,7 +69,6 @@ public class QueryProcessor {
         for (Iterator<String> it = split.iterator(); it.hasNext();) {
             String token = it.next().replaceAll("[)(]", "").trim();
             if (token.startsWith("\"")) {
-                containPositive = true;
                 target++;
                 String substring = token.trim().substring(1, token.length());
                 Set<Integer> processPhrase;
@@ -98,22 +95,21 @@ public class QueryProcessor {
                     andSplit.put(docId, value + 1);
                 });
             } else if (token.startsWith("(")) {
-                containPositive = true;
                 target++;
-                String newquery = token.substring(1, token.length());
-                if (newquery.endsWith(")")) {
-                    newquery = newquery.substring(0, newquery.length() - 1);
+                String queryInBrackets = token.substring(1, token.length());
+                if (queryInBrackets.endsWith(")")) {
+                    queryInBrackets = queryInBrackets.substring(0, queryInBrackets.length() - 1);
                 } else {
                     while (it.hasNext()) {
                         String next = it.next().trim();
                         if (next.endsWith(")")) {
-                            newquery = newquery + " " + next.substring(0, next.length() - 1);
+                            queryInBrackets = queryInBrackets + " " + next.substring(0, next.length() - 1);
                             break;
                         }
-                        newquery = newquery + " " + next;
+                        queryInBrackets = queryInBrackets + " " + next;
                     }
                 }
-                Set<Integer> processQuery = processQuery(newquery);
+                Set<Integer> processQuery = processQuery(queryInBrackets);
                 processQuery.stream().forEach((Integer docId) -> {
                     Integer value = andSplit.getOrDefault(docId, 0);
                     andSplit.put(docId, value + 1);
@@ -130,7 +126,6 @@ public class QueryProcessor {
                         andSplit.put(docId, value - 1);
                     }
                 } else {        // single positive token
-                    containPositive = true;
                     target++;
                     Iterator<Integer> keySet = index.getPostings(porterstemmer.
                             processToken(token)).keySet().iterator();
@@ -216,8 +211,8 @@ public class QueryProcessor {
         HashMap<Integer, Set<Long>> result = new HashMap<>();
         Iterator<Integer> term1_DocIds = index.getPostings(term1).keySet().iterator();
         Iterator<Integer> term2_DocIds = index.getPostings(term2).keySet().iterator();
-        Integer term1_DocId = null;
-        Integer term2_DocId = null;
+        Integer term1_DocId;
+        Integer term2_DocId;
         if (term1_DocIds.hasNext() && term2_DocIds.hasNext()) {
             term1_DocId = term1_DocIds.next();
             term2_DocId = term2_DocIds.next();

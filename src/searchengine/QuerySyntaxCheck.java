@@ -5,20 +5,17 @@
  */
 package searchengine;
 
-import javax.swing.JOptionPane;
-
 /**
  *
  * @author metehan
  */
 public class QuerySyntaxCheck {
 
-    // checks if no empty Q_i
-    private boolean isNoEmptyQ;
-    // checks if each Q_i has at least one positive literal
-    private boolean isOnePost;
     private String errorMessage = "valid";
 
+//    public QuerySyntaxCheck() {
+//        errorMessage = "valid";
+//    }
     // returns a success or error message for the parenthesization of the query
     public String checkParenthesis(String query) {
         boolean isParenthesis = true;
@@ -43,6 +40,24 @@ public class QuerySyntaxCheck {
         }
         if (!isParenthesis) {
             errorMessage = "Invalid parenthesization";
+        }
+        return errorMessage;
+    }
+
+    // checks if query has quotes properly closed
+    public String checkQuotes(String query) {
+        boolean isQuote = true;
+        errorMessage = "valid";
+        for (int i = 0; i < query.length(); i++) {
+            char c = query.charAt(i);
+            if (!isQuote && ("" + c).matches("[+)(-]")) {
+                break;
+            } else if (c == '"') {
+                isQuote = !isQuote;
+            }
+        }
+        if (!isQuote) {
+            errorMessage = "Double Quotes not used correctly";
         }
         return errorMessage;
     }
@@ -113,6 +128,10 @@ public class QuerySyntaxCheck {
         }
         String message3 = checkOnePosLit(query);
         if (!message3.equals("valid")) {
+            return false;
+        }
+        String message4 = checkQuotes(query);
+        if (!message4.equals("valid")) {
             return false;
         }
         return true;

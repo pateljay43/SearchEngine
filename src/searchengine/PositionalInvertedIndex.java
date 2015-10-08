@@ -28,16 +28,15 @@ public class PositionalInvertedIndex {
     private int longestWord;
 
     // Variables for statistics
-    private long totalDocumentCount;
+    private long totalDocumentsFrequency;
+    private int numOfDocuments;
     private long totalMemory;
-//    private final SearchEngine searchEngine;
 
     /**
      * creates new mIndex which stores terms with document in which it occurs
      * and positions where it occurs in that document
      */
-    public PositionalInvertedIndex(SearchEngine _searchEngine) {
-//        searchEngine = _searchEngine;
+    public PositionalInvertedIndex() {
         mIndex = new HashMap<>();
         longestWord = 0;
         df2 = new DecimalFormat("#.##");
@@ -71,6 +70,8 @@ public class PositionalInvertedIndex {
      * positions (<document,[position1,..]>)
      */
     public TreeMap<Integer, ArrayList<Long>> getPostings(String term) {
+        ArrayList<String> arrayList = new ArrayList<>(mIndex.keySet());
+        System.out.println("" + arrayList.indexOf(term));
         return mIndex.getOrDefault(term, new TreeMap<>());
     }
 
@@ -118,10 +119,10 @@ public class PositionalInvertedIndex {
     }
 
     /**
-     * @return the totalDocumentCount
+     * @return the totalDocumentsFrequency
      */
-    public long getTotalDocumentCount() {
-        return totalDocumentCount;
+    public long getTotalDocumentsFrequency() {
+        return totalDocumentsFrequency;
     }
 
     /**
@@ -134,7 +135,7 @@ public class PositionalInvertedIndex {
         long totalStrMem = 0;
         long totalPostListMem = 0;
         long totalPostMem = 0;
-        totalDocumentCount = 0;
+        totalDocumentsFrequency = 0;
 
         // set of all terms
         Set keys = mIndex.keySet();
@@ -159,11 +160,11 @@ public class PositionalInvertedIndex {
             while (docItr.hasNext()) {
                 int docKey = (Integer) docItr.next();
                 totalPostMem = totalPostMem + 48 + 4 * mIndex.get(key).get(docKey).size();
-                totalDocumentCount++;
+                totalDocumentsFrequency++;
             }
         }
         totalMemory = hashMem + totalStrMem + totalPostListMem + totalPostMem;
-        avgDocPerTerm = ((double) totalDocumentCount) / mIndex.size();
+        avgDocPerTerm = ((double) totalDocumentsFrequency) / mIndex.size();
         mostFrequentTerms(mostFreqLimit);
     }
 
@@ -171,7 +172,6 @@ public class PositionalInvertedIndex {
      * find k most frequent terms from the index
      *
      * @param k must be greater than 1
-     * @return
      */
     public void mostFrequentTerms(int k) {
         mostFreqTerms = "";
@@ -194,7 +194,7 @@ public class PositionalInvertedIndex {
         }
         temp.stream().forEach((key) -> {
             mostFreqTerms = mostFreqTerms + "\t<" + key + ", "
-                    + df2.format((double) mIndex.get(key).size() / SearchEngine.mDocumentID) + ">\n";
+                    + df2.format((double) mIndex.get(key).size() / numOfDocuments) + ">\n";
         });
     }
 
@@ -204,5 +204,9 @@ public class PositionalInvertedIndex {
 
     public double getAvgDocPerTerm() {
         return avgDocPerTerm;
+    }
+
+    public void setNumOfDocuments(int numOfDocuments) {
+        this.numOfDocuments = numOfDocuments;
     }
 }

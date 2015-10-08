@@ -40,7 +40,6 @@ public class SearchEngine {
     private Set<String> types;
     private PositionalInvertedIndex index;
     private ArrayList<String> fileNames;
-//    private static final String folderName = "Search Space";
     private Path currentWorkingPath;
     private JFileChooser directoryPicker;
     private GUI UI;
@@ -60,9 +59,10 @@ public class SearchEngine {
             searchEngine = new SearchEngine();
             while (!searchEngine.UI.isChangeIndex()) {
                 try {
-                    Thread.sleep(1000);
+                    Thread.sleep(500);
                 } catch (InterruptedException ex) {
                     Logger.getLogger(SearchEngine.class.getName()).log(Level.SEVERE, null, ex);
+                    System.exit(0);
                 }
             }
             if (searchEngine.UI.isQuit()) {
@@ -73,6 +73,7 @@ public class SearchEngine {
                 searchEngine.finalize();
             } catch (Throwable ex) {
                 Logger.getLogger(SearchEngine.class.getName()).log(Level.SEVERE, null, ex);
+                System.exit(0);
             }
         }
     }
@@ -83,7 +84,7 @@ public class SearchEngine {
         types = new HashSet<>();
         directoryPicker = new JFileChooser();
         porterstemmer = new PorterStemmer();
-        index = new PositionalInvertedIndex(this);
+        index = new PositionalInvertedIndex();
         fileNames = new ArrayList<>();
     }
 
@@ -167,10 +168,11 @@ public class SearchEngine {
                         IOException e) {
                     return FileVisitResult.CONTINUE;
                 }
-
             });
+            index.setNumOfDocuments(mDocumentID);
         } catch (IOException ex) {
             Logger.getLogger(SearchEngine.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(0);
         }
         frame.dispose();
 
@@ -199,7 +201,7 @@ public class SearchEngine {
             simpleTokenStream = new SimpleTokenStream(file);
         } catch (FileNotFoundException ex) {
             ex.printStackTrace();
-            return;
+            System.exit(0);
         }
         long position = 0;
         while (simpleTokenStream.hasNextToken()) {

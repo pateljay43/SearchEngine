@@ -22,12 +22,10 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.AbstractAction;
 import javax.swing.JButton;
-import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -49,7 +47,8 @@ public class GUI extends JFrame implements MouseListener {
     private final QuerySyntaxCheck syntaxChecker;
     private final ArrayList<String> fileNames;
     private static HashMap<String, List<Integer>> queryHistory;
-//    private static int queryHistoryPointer;
+    private static ArrayList<String> queryHistoryArray;
+    private static int queryHistoryPointer;
     private List<Integer> queryResult;
 
     private final JTextField queryTF;
@@ -61,6 +60,8 @@ public class GUI extends JFrame implements MouseListener {
     private final JScrollPane tableScrollPane;
     private final JLabel processingTimeLBL;
     private final JLabel processingTime;
+    private final JLabel numOfDocumentsLBL;
+    private final JLabel numOfDocuments;
     private final JLabel indexStatisticsLBL;
     private boolean changeIndex;
     private final Path currentWorkingPath;
@@ -85,7 +86,8 @@ public class GUI extends JFrame implements MouseListener {
         syntaxChecker = new QuerySyntaxCheck();
         queryResult = new ArrayList<>();
         queryHistory = new HashMap<>();
-//        queryHistoryPointer = queryHistory.size();
+        queryHistoryArray = new ArrayList<>();
+        queryHistoryPointer = 0;
         df2 = new DecimalFormat("#.##");
 
         indexStatisticsLBL = new JLabel("Index Statistics:-  Press (Ctrl + i)");
@@ -120,7 +122,14 @@ public class GUI extends JFrame implements MouseListener {
 
         searchBtn = new JButton("Search");
         searchBtn.setBounds(670, 40, 120, 25);
-        searchBtn.addActionListener(new ActionListenerImpl());
+        searchBtn.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (startQueryProcessor(true, System.nanoTime())) {
+                    queryHistoryPointer = queryHistory.size() - 1;
+                }
+            }
+        });
         searchBtn.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_I, Event.CTRL_MASK), "ctrl+i");
         searchBtn.getActionMap().put("ctrl+i", new AbstractAction() {
             @Override
@@ -164,6 +173,14 @@ public class GUI extends JFrame implements MouseListener {
         processingTime.setBounds(140, 375, 150, 30);
         add(processingTime);
 
+        numOfDocumentsLBL = new JLabel("Number Of Documents: ");
+        numOfDocumentsLBL.setBounds(450, 375, 150, 30);
+        add(numOfDocumentsLBL);
+
+        numOfDocuments = new JLabel("0");
+        numOfDocuments.setBounds(610, 375, 100, 30);
+        add(numOfDocuments);
+
         setTitle("Enter your search query");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(800, 70 + offset);
@@ -171,6 +188,8 @@ public class GUI extends JFrame implements MouseListener {
         setLayout(null);
         setLocationRelativeTo(null);
         setVisible(true);
+
+        queryTF.requestFocus();
     }
 
     /**
@@ -180,9 +199,11 @@ public class GUI extends JFrame implements MouseListener {
         String query = queryTF.getText().trim();
         if (showErrors && queryHistory.containsKey(query)) {
             queryResult = queryHistory.get(query);
-            showResultPanel();
+            addToHistory(query);
+            showResultPanel(showErrors);
             processingTime.setText(BigDecimal.valueOf(((double) System.nanoTime() - sTime) / 1000000)
                     + " milliseconds");
+            numOfDocuments.setText(queryResult.size() + "");
             System.out.println("From Cache mem");
             return true;
         }
@@ -213,14 +234,15 @@ public class GUI extends JFrame implements MouseListener {
                 queryTF.setText("");
                 return false;
             }
-            Set<Integer> processQuery = queryProcessor.processQuery(query);
-            queryResult = new ArrayList<>(processQuery);
+            queryResult = new ArrayList<>(queryProcessor.processQuery(query));
             if (!queryResult.isEmpty()) {
                 tableModel.fireTableDataChanged();
-                showResultPanel();
+                showResultPanel(showErrors);
                 if (showErrors) {
                     processingTime.setText(BigDecimal.valueOf(((double) System.nanoTime() - sTime) / 1000000)
                             + " milliseconds");
+                    numOfDocuments.setText(queryResult.size() + "");
+                    addToHistory(query);
                 }
             } else {
                 hideResultPanel();
@@ -237,36 +259,29 @@ public class GUI extends JFrame implements MouseListener {
         return ret;
     }
 
-    public final void showResultPanel() {
-        this.setSize(800, 405 + offset);
-        this.setResizable(false);
-        this.setLocationRelativeTo(null);
+    public final void showResultPanel(boolean show) {
+        if (!show && queryHistory.containsKey(queryTF.getText())) {
+            show = true;
+        }
+        processingTime.setVisible(show);
+        processingTimeLBL.setVisible(show);
+        numOfDocuments.setVisible(show);
+        numOfDocumentsLBL.setVisible(show);
+        setSize(800, 405 + offset);
+        setLocationRelativeTo(null);
     }
 
     public final void hideResultPanel() {
-        this.setSize(800, 70 + offset);
-        this.setResizable(false);
-        this.setLocationRelativeTo(null);
+        if (queryHistory.containsKey(queryTF.getText())) {
+            return;
+        }
+        setSize(800, 70 + offset);
+        setLocationRelativeTo(null);
     }
 
     private void setChangeIndex() {
         this.setVisible(false);
         this.changeIndex = true;
-    }
-
-    public static void main(String[] args) {
-        JFileChooser chooser = new JFileChooser();
-        chooser.setCurrentDirectory(new java.io.File(""));
-        chooser.setDialogTitle("Select any directory with text files");
-        chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        chooser.setAcceptAllFileFilterUsed(false);
-
-        if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-            System.out.println("getCurrentDirectory(): " + chooser.getCurrentDirectory());
-            System.out.println("getSelectedFile() : " + chooser.getSelectedFile());
-        } else {
-            System.out.println("No Selection ");
-        }
     }
 
     private void openFile(int row) {
@@ -285,6 +300,131 @@ public class GUI extends JFrame implements MouseListener {
 
     public boolean isQuit() {
         return quit;
+    }
+
+    private void addToHistory(String query) {
+        if (queryHistory.containsKey(query)) {
+            queryHistoryArray.add(queryHistoryArray.remove(queryHistoryArray.indexOf(query)));
+        } else {
+            queryHistory.put(query, queryResult);
+            queryHistoryArray.add(query);
+            queryHistoryPointer = queryHistory.size() - 1;
+        }
+    }
+
+    /**
+     * # of Terms, # of Types, Average number of documents per term, 10 most
+     * frequent terms, Approximate total memory required by index
+     */
+    private void showStatistics() {
+        JOptionPane.showMessageDialog(this,
+                "Number of Terms: " + index.getTermCount() + "\n"
+                + "Number of Types (distinct tokens): " + numOfTypes + "\n"
+                + "Average number of documents per term: " + df2.format(index.getAvgDocPerTerm()) + "\n"
+                + "Approximate total memory requirement: "
+                + df2.format(index.getTotalMemory() / Math.pow(2.00, 20))
+                + " Megabytes\n"
+                + "10 most frequent words statistics: (term, document frequency) \n"
+                + index.getMostFreqTerms(),
+                "Index Statistics", JOptionPane.INFORMATION_MESSAGE
+        );
+    }
+
+    private class KeyListenerImpl implements KeyListener {
+
+        public KeyListenerImpl() {
+        }
+
+        @Override
+        public void keyTyped(KeyEvent e) {
+        }
+
+        @Override
+        public void keyPressed(KeyEvent e) {
+            int key = e.getKeyCode();
+            if (key == KeyEvent.VK_ENTER) {
+                if (startQueryProcessor(true, System.nanoTime())) {
+                    queryHistoryPointer = queryHistory.size() - 1;
+                }
+            } else if (key == KeyEvent.VK_ESCAPE) {
+                ((JTextField) e.getSource()).setText("");
+                queryHistoryPointer = queryHistory.size();
+                hideResultPanel();
+            } else if (key == KeyEvent.VK_UP) {
+                if (queryHistoryPointer > 0) {
+                    long sTime = System.nanoTime();
+                    queryHistoryPointer--;
+                    String query = queryHistoryArray.get(queryHistoryPointer);
+                    ((JTextField) e.getSource()).setText(query);
+                    queryResult = queryHistory.get(query);
+                    if (!queryResult.isEmpty()) {
+                        showResultPanel(true);
+                        processingTime.setText(BigDecimal
+                                .valueOf(((double) System.nanoTime() - sTime) / 1000000)
+                                + " milliseconds");
+                        numOfDocuments.setText(queryResult.size() + "");
+                    }
+                }
+            } else if (key == KeyEvent.VK_DOWN) {
+                if (queryHistoryPointer < queryHistory.size() - 1) {
+                    long sTime = System.nanoTime();
+                    queryHistoryPointer++;
+                    String query = queryHistoryArray.get(queryHistoryPointer);
+                    ((JTextField) e.getSource()).setText(query);
+                    queryResult = queryHistory.get(query);
+                    if (!queryResult.isEmpty()) {
+                        showResultPanel(true);
+                        processingTime.setText(BigDecimal
+                                .valueOf(((double) System.nanoTime() - sTime) / 1000000)
+                                + " milliseconds");
+                        numOfDocuments.setText(queryResult.size() + "");
+                    }
+                }
+            }
+        }
+
+        @Override
+        public void keyReleased(KeyEvent e) {
+            int key = e.getKeyCode();
+            String text = ((JTextField) e.getSource()).getText();
+            if (key == KeyEvent.VK_DELETE || key == KeyEvent.VK_BACK_SPACE) {
+                if (text.equals("")) {
+                    hideResultPanel();
+                } else if (text.length() >= 3) {
+                    startQueryProcessor(false, System.nanoTime());
+                }
+            } else if (key != KeyEvent.VK_ENTER && key != KeyEvent.VK_ESCAPE) {
+                if (text.length() >= 3) {
+                    startQueryProcessor(false, System.nanoTime());
+                } else if (text.length() < 3) {
+                    hideResultPanel();
+                }
+            }
+        }
+    }
+
+    @Override
+    public void mouseClicked(MouseEvent e) {
+        if (e.getClickCount() == 2) {
+            int row = ((JTable) e.getSource()).getSelectedRow();
+            openFile(row);
+        }
+    }
+
+    @Override
+    public void mousePressed(MouseEvent e) {
+    }
+
+    @Override
+    public void mouseReleased(MouseEvent e) {
+    }
+
+    @Override
+    public void mouseEntered(MouseEvent e) {
+    }
+
+    @Override
+    public void mouseExited(MouseEvent e) {
     }
 
     class TableModel extends AbstractTableModel {
@@ -329,116 +469,4 @@ public class GUI extends JFrame implements MouseListener {
             return false;
         }
     }
-
-    private class KeyListenerImpl implements KeyListener {
-
-        public KeyListenerImpl() {
-        }
-
-        @Override
-        public void keyTyped(KeyEvent e) {
-        }
-
-        @Override
-        public void keyPressed(KeyEvent e) {
-            int key = e.getKeyCode();
-            if (key == KeyEvent.VK_ENTER) {
-                if (startQueryProcessor(true, System.nanoTime())) {
-                    queryHistory.put(((JTextField) e.getSource()).getText().trim(),
-                            queryResult);
-//                    queryHistoryPointer = queryHistory.size();
-                }
-            } else if (key == KeyEvent.VK_ESCAPE) {
-                ((JTextField) e.getSource()).setText("");
-                hideResultPanel();
-            }
-//            else if (key == KeyEvent.VK_UP) {
-//                if (queryHistoryPointer > 0) {
-//                    queryHistoryPointer--;
-//                    ((JTextField) e.getSource()).setText(queryHistory.get(queryHistoryPointer));
-//                }
-//            } else if (key == KeyEvent.VK_DOWN) {
-//                if (queryHistoryPointer < queryHistory.size() - 1) {
-//                    queryHistoryPointer++;
-//                    ((JTextField) e.getSource()).setText(queryHistory.get(queryHistoryPointer));
-//                }
-//            }
-        }
-
-        @Override
-        public void keyReleased(KeyEvent e) {
-            int key = e.getKeyCode();
-            String text = ((JTextField) e.getSource()).getText();
-            if (key == KeyEvent.VK_DELETE || key == KeyEvent.VK_BACK_SPACE) {
-                if (text.equals("")) {
-                    hideResultPanel();
-                } else if (text.length() >= 3) {
-                    startQueryProcessor(false, System.nanoTime());
-                }
-            } else if (key != KeyEvent.VK_ENTER && key != KeyEvent.VK_ESCAPE) {
-                if (text.length() >= 3) {
-                    startQueryProcessor(false, System.nanoTime());
-                } else if (text.length() < 3) {
-                    hideResultPanel();
-                }
-            }
-        }
-    }
-
-    private class ActionListenerImpl implements ActionListener {
-
-        public ActionListenerImpl() {
-        }
-
-        @Override
-        public void actionPerformed(ActionEvent e) {
-            if (startQueryProcessor(true, System.nanoTime())) {
-                queryHistory.put(queryTF.getText().trim(), queryResult);
-//                queryHistoryPointer = queryHistory.size();
-            }
-        }
-    }
-
-    /**
-     * # of Terms, # of Types, Average number of documents per term, 10 most
-     * frequent terms, Approximate total memory required by index
-     */
-    private void showStatistics() {
-        JOptionPane.showMessageDialog(this,
-                "Number of Terms: " + index.getTermCount() + "\n"
-                + "Number of Types (distinct tokens): " + numOfTypes + "\n"
-                + "Average number of documents per term: " + df2.format(index.getAvgDocPerTerm()) + "\n"
-                + "Approximate total memory requirement: "
-                + df2.format(index.getTotalMemory() / Math.pow(2.00, 20))
-                + " Megabytes\n"
-                + "10 most frequent words statistics: (term,document frequency) \n"
-                + index.getMostFreqTerms(),
-                "Index Statistics", JOptionPane.INFORMATION_MESSAGE
-        );
-    }
-
-    @Override
-    public void mouseClicked(MouseEvent e) {
-        if (e.getClickCount() == 2) {
-            int row = ((JTable) e.getSource()).getSelectedRow();
-            openFile(row);
-        }
-    }
-
-    @Override
-    public void mousePressed(MouseEvent e) {
-    }
-
-    @Override
-    public void mouseReleased(MouseEvent e) {
-    }
-
-    @Override
-    public void mouseEntered(MouseEvent e) {
-    }
-
-    @Override
-    public void mouseExited(MouseEvent e) {
-    }
-
 }
