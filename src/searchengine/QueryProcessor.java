@@ -63,7 +63,15 @@ public class QueryProcessor {
      * @return document IDs for Q
      */
     private Set<Integer> processQueryLiterals(String query) {
-        List<String> split = Arrays.asList(query.split(" "));
+        List<String> split = new ArrayList<>();
+        if (query.startsWith("-")) {
+            String temp = query.substring(1, query.length());
+            if (temp.startsWith("\"") && temp.endsWith("\"")) {
+                split.add(query);
+            }
+        } else {
+            split = Arrays.asList(query.split(" "));
+        }
         int target = 0;
         HashMap<Integer, Integer> andSplit = new HashMap<>();
         for (Iterator<String> it = split.iterator(); it.hasNext();) {
@@ -118,8 +126,13 @@ public class QueryProcessor {
                 token = token.trim();
                 if (token.startsWith("-")) {  // NOT token
                     token = token.substring(1, token.length());
-                    Iterator<Integer> keySet = index.getPostings(porterstemmer.
-                            processToken(token)).keySet().iterator();
+                    Iterator<Integer> keySet;
+                    if (token.startsWith("\"") && token.endsWith("\"")) {     // -Phrase query
+                        keySet = processQuery(token).iterator();
+                    } else {
+                        keySet = index.getPostings(porterstemmer.
+                                processToken(token)).keySet().iterator();
+                    }
                     while (keySet.hasNext()) {
                         Integer docId = keySet.next();
                         Integer value = andSplit.getOrDefault(docId, 0);
@@ -219,6 +232,9 @@ public class QueryProcessor {
             boolean quit = false;
             while (!quit) {
                 if (Objects.equals(term1_DocId, term2_DocId)) {
+                    if (term1_DocId == 962 || term2_DocId == 962) {
+                        int x = 5;
+                    }
                     Iterator<Long> term1_DocId_posList = index.getPositionalList(term1, term1_DocId).iterator();
                     Iterator<Long> term2_DocId_posList = index.getPositionalList(term2, term2_DocId).iterator();
                     if (term1_DocId_posList.hasNext() && term2_DocId_posList.hasNext()) {
@@ -251,7 +267,7 @@ public class QueryProcessor {
                                     }
                                     break;
                                 }
-                            } else if (p2 < p1) {
+                            } else if (p2 <= p1) {
                                 if (term2_DocId_posList.hasNext()) {
                                     p2 = term2_DocId_posList.next();
                                 } else {
